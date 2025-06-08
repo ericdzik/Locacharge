@@ -11,3 +11,11 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+*.jar
+*.apk
+*.aab
+/build/
+/caches/
+.gradle/
+/android/.gradle/
+/android/**/build/
