@@ -1,11 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
 package="com.example.locacharge">
 <uses-permission android:name="android.permission.INTERNET"/>
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
     <application
         android:label="locacharge"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Mapbox Access Token -->
+        <meta-data
+            android:name="com.mapbox.token"
+            android:value="VOTRE_TOKEN_MAPBOX"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"
