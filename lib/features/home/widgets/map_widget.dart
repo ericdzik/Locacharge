@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:mapbox_gl/mapbox_gl.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
 
 class MapWidget extends StatefulWidget {
@@ -10,10 +11,8 @@ class MapWidget extends StatefulWidget {
 }
 
 class _MapWidgetState extends State<MapWidget> {
-  MapboxMapController? _controller;
   Location _location = Location();
-  LocationData? _currentLocation;
-  List<Symbol> _symbols = [];
+  LatLng? _currentLatLng;
 
   @override
   void initState() {
@@ -23,22 +22,12 @@ class _MapWidgetState extends State<MapWidget> {
 
   Future<void> _getCurrentLocation() async {
     try {
-      _currentLocation = await _location.getLocation();
-      if (_currentLocation != null && _controller != null) {
-        _controller!.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: LatLng(
-                _currentLocation!.latitude!,
-                _currentLocation!.longitude!,
-              ),
-              zoom: 15,
-            ),
-          ),
-        );
-
+      final currentLocation = await _location.getLocation();
+      if (currentLocation.latitude != null &&
+          currentLocation.longitude != null) {
         setState(() {
-          _addCurrentLocationMarker();
+          _currentLatLng =
+              LatLng(currentLocation.latitude!, currentLocation.longitude!);
         });
       }
     } catch (e) {
@@ -46,46 +35,37 @@ class _MapWidgetState extends State<MapWidget> {
     }
   }
 
-  void _addCurrentLocationMarker() async {
-    if (_currentLocation != null && _controller != null) {
-      await _controller!.addSymbol(
-        SymbolOptions(
-          geometry: LatLng(
-            _currentLocation!.latitude!,
-            _currentLocation!.longitude!,
-          ),
-          iconImage: 'marker-15',
-          iconSize: 2.0,
-          textField: 'Ma position',
-          textOffset: const Offset(0, 1.5),
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: MapboxMap(
-        accessToken: 'VOTRE_TOKEN_MAPBOX', // À remplacer par votre token Mapbox
-        onMapCreated: (MapboxMapController controller) {
-          _controller = controller;
-          _getCurrentLocation();
-        },
-        initialCameraPosition: const CameraPosition(
-          target: LatLng(48.8566, 2.3522), // Paris par défaut
-          zoom: 12,
+      body: FlutterMap(
+        options: MapOptions(
+          center: _currentLatLng ?? LatLng(48.8566, 2.3522),
+          zoom: 13.0,
         ),
-        myLocationEnabled: true,
-        myLocationRenderMode: MyLocationRenderMode.NORMAL,
-        myLocationTrackingMode: MyLocationTrackingMode.Tracking,
+        children: [
+          TileLayer(
+            urlTemplate:
+                "https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}",
+            additionalOptions: const {
+              'accessToken': 'pk.eyJ1IjoibWFwYm94cnMyMSIsImEiOiJjamdkdTU1MTIwMTM2Mnhxa3Y3ZXZ3eGt3In0.PtflK7MObAbmwY1E__H7Fg',
+              'id': 'mapbox/streets-v11',
+            },
+          ),
+          if (_currentLatLng != null)
+            MarkerLayer(
+              markers: [
+                Marker(
+                  width: 40.0,
+                  height: 40.0,
+                  point: _currentLatLng!,
+                  child: const Icon(Icons.location_on,
+                      color: Colors.red, size: 40),
+                ),
+              ],
+            ),
+        ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
   }
 }

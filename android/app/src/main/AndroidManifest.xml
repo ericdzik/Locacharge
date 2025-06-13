@@ -11,7 +11,7 @@ package="com.example.locacharge">
         <!-- Mapbox Access Token -->
         <meta-data
             android:name="com.mapbox.token"
-            android:value="VOTRE_TOKEN_MAPBOX"/>
+            android:value="pk.eyJ1IjoibWFwYm94cnMyMSIsImEiOiJjamdkdTU1MTIwMTM2Mnhxa3Y3ZXZ3eGt3In0.PtflK7MObAbmwY1E__H7Fg"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"
