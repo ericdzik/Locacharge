@@ -4,14 +4,14 @@ import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
 
 class MapWidget extends StatefulWidget {
-  const MapWidget({Key? key}) : super(key: key);
+  const MapWidget({super.key});
 
   @override
   State<MapWidget> createState() => _MapWidgetState();
 }
 
 class _MapWidgetState extends State<MapWidget> {
-  Location _location = Location();
+  final Location _location = Location();
   LatLng? _currentLatLng;
 
   @override
@@ -31,7 +31,7 @@ class _MapWidgetState extends State<MapWidget> {
         });
       }
     } catch (e) {
-      print('Erreur lors de la récupération de la position: $e');
+      // print('Erreur lors de la récupération de la position: $e'); // Utiliser un logger en prod
     }
   }
 
@@ -40,15 +40,16 @@ class _MapWidgetState extends State<MapWidget> {
     return Scaffold(
       body: FlutterMap(
         options: MapOptions(
-          center: _currentLatLng ?? LatLng(48.8566, 2.3522),
-          zoom: 13.0,
+          initialCenter: _currentLatLng ?? LatLng(48.8566, 2.3522),
+          initialZoom: 13.0,
         ),
         children: [
           TileLayer(
             urlTemplate:
                 "https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}",
             additionalOptions: const {
-              'accessToken': 'pk.eyJ1IjoibWFwYm94cnMyMSIsImEiOiJjamdkdTU1MTIwMTM2Mnhxa3Y3ZXZ3eGt3In0.PtflK7MObAbmwY1E__H7Fg',
+              'accessToken':
+                  'pk.eyJ1IjoibWFwYm94cnMyMSIsImEiOiJjamdkdTU1MTIwMTM2Mnhxa3Y3ZXZ3eGt3In0.PtflK7MObAbmwY1E__H7Fg',
               'id': 'mapbox/streets-v11',
             },
           ),

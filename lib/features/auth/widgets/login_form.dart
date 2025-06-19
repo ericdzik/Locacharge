@@ -31,9 +31,8 @@ class _LoginFormState extends State<LoginForm> {
 
     try {
       await AuthService().signInWithEmail(email, password);
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, "/home");
-      }
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, "/home");
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message);
     } finally {
@@ -50,7 +49,8 @@ class _LoginFormState extends State<LoginForm> {
         padding: const EdgeInsets.all(24.0),
         child: Card(
           elevation: 8,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           color: Colors.white,
           child: Padding(
             padding: const EdgeInsets.all(24.0),
@@ -127,38 +127,35 @@ class _LoginFormState extends State<LoginForm> {
                       ),
                 const SizedBox(height: 12),
                 const SizedBox(height: 8),
-SizedBox(
-  width: double.infinity,
-  child: ElevatedButton.icon(
-    icon: const Icon(Icons.login, size: 20),
-    label: const Text(
-      "Continuer avec Google",
-      overflow: TextOverflow.ellipsis,
-    ),
-    onPressed: () async {
-      setState(() => _isLoading = true);
-      try {
-        final userCredential = await AuthService().signInWithGoogle();
-        if (userCredential != null && mounted) {
-          Navigator.pushReplacementNamed(context, '/home');
-        }
-      } catch (e) {
-        setState(() => _error = "Échec de la connexion Google");
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
-      }
-    },
-    style: ElevatedButton.styleFrom(
-      backgroundColor: Colors.redAccent,
-      foregroundColor: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-    ),
-  ),
-),
-
-
-
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.login, size: 20),
+                    label: const Text(
+                      "Continuer avec Google",
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onPressed: () async {
+                      setState(() => _isLoading = true);
+                      try {
+                        await AuthService().signInWithGoogle();
+                        if (!mounted) return;
+                        Navigator.pushReplacementNamed(context, '/home');
+                      } catch (e) {
+                        setState(() => _error = "Échec de la connexion Google");
+                      } finally {
+                        if (mounted) setState(() => _isLoading = false);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
                 TextButton(
                   onPressed: () {
                     Navigator.pushNamed(context, "/signup");
