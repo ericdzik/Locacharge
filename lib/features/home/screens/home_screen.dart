@@ -284,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     // final localizations = AppLocalizations.of(context)!;
 
-    if (AppConfig.mapboxAccessToken == 'YOUR_MAPBOX_ACCESS_TOKEN' || AppConfig.mapboxAccessToken.isEmpty) {
+    if (AppConfig.mapboxAccessToken == 'YOUR_MAPBOX_ACCESS_TOKEN_HERE' || AppConfig.mapboxAccessToken.isEmpty) {
        return const Scaffold(
         body: Center(
           child: Padding(

@@ -12,7 +12,7 @@ class MapsService {
 
 
   Future<EtaResult?> getEtaFromMapbox(LatLng origin, LatLng destination, String profile) async {
-    if (_mapboxAccessToken == 'YOUR_MAPBOX_ACCESS_TOKEN' || _mapboxAccessToken.isEmpty) {
+    if (_mapboxAccessToken == 'YOUR_MAPBOX_ACCESS_TOKEN_HERE' || _mapboxAccessToken.isEmpty) {
       print("Erreur: Clé d'accès Mapbox non configurée.");
       // throw Exception("Clé d'accès Mapbox non configurée."); // Ou retourner null
       return null;
