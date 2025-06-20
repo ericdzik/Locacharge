@@ -1,73 +1,154 @@
 // lib/features/home/screens/fiche_commercant_screen.dart
-// (Considérez ce fichier comme CommercantDetailScreen pour cette étape)
 import 'package:flutter/material.dart';
 import 'package:locacharge/core/models/commercant_model.dart';
-import 'package:locacharge/core/models/horaire_model.dart'; // Pour la fonction estActuellementOuvert
-// import 'package:url_launcher/url_launcher.dart'; // Pour lancer des appels ou des cartes
+import 'package:locacharge/core/models/horaire_model.dart';
+import 'package:locacharge/core/services/maps_service.dart'; // Importer le service MapsService
+import 'package:locacharge/core/models/eta_result_model.dart'; // Importer EtaResult
+import 'package:mapbox_gl/mapbox_gl.dart'; // Pour LatLng
+import 'package:geolocator/geolocator.dart'; // Pour la position utilisateur
 
-class CommercantDetailScreen extends StatelessWidget {
+class CommercantDetailScreen extends StatefulWidget {
   final CommercantModel commercant;
 
   const CommercantDetailScreen({super.key, required this.commercant});
 
-  // Helper pour formater les horaires
+  @override
+  State<CommercantDetailScreen> createState() => _CommercantDetailScreenState();
+}
+
+class _CommercantDetailScreenState extends State<CommercantDetailScreen> {
+  final MapsService _mapsService = MapsService(); // Instancier le service
+  Future<String>? _etaFutureVoiture;
+  Future<String>? _etaFuturePied;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEtaData();
+  }
+
+  Future<Position?> _getCurrentPosition() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+        return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
+      }
+    } catch (e) {
+      print("Erreur Geolocator dans CommercantDetailScreen: $e");
+    }
+    return null; // Retourne null si permission non accordée ou erreur
+  }
+
+  void _loadEtaData() {
+    // Pas besoin de setState ici car _etaFutureVoiture et _etaFuturePied sont des Futures
+    // et le FutureBuilder réagira à leur changement d'état.
+    // On assigne directement les futures.
+    _etaFutureVoiture = _getEtaDescriptionWithProfile('mapbox/driving-traffic');
+    _etaFuturePied = _getEtaDescriptionWithProfile('mapbox/walking');
+  }
+
+  Future<String> _getEtaDescriptionWithProfile(String mapboxProfile) async {
+    final Position? userPosition = await _getCurrentPosition();
+
+    if (userPosition == null) {
+      return "Position utilisateur inconnue";
+    }
+
+    final LatLng origin = LatLng(userPosition.latitude, userPosition.longitude);
+    final LatLng destination = LatLng(widget.commercant.localisation.latitude, widget.commercant.localisation.longitude);
+
+    try {
+      final EtaResult? etaResult = await _mapsService.getEtaFromMapbox(origin, destination, mapboxProfile);
+      if (etaResult != null) {
+        String profileText = "";
+        if (mapboxProfile.contains("driving")) {
+          profileText = "en voiture";
+        } else if (mapboxProfile.contains("walking")) {
+          profileText = "à pied";
+        }
+        return "Environ ${etaResult.durationFormatted} (${etaResult.distanceFormatted}) $profileText";
+      } else {
+        return "ETA non disponible ($mapboxProfile)";
+      }
+    } catch (e) {
+      print("Erreur calcul ETA ($mapboxProfile): $e");
+      return "Erreur calcul ETA ($mapboxProfile)";
+    }
+  }
+
+  // Helper pour formater les horaires (identique à la version précédente)
   Widget _buildHoraires(BuildContext context) {
-    if (commercant.horaires.isEmpty) {
+    if (widget.commercant.horaires.isEmpty) {
       return const Text("Horaires non disponibles.");
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: commercant.horaires.map((h) {
+      children: widget.commercant.horaires.map((h) {
         final text = h.estOuvert24h ? "${h.jour}: Ouvert 24h/24" : "${h.jour}: ${h.ouverture} - ${h.fermeture}";
         return Text(text);
       }).toList(),
     );
   }
 
-  // Placeholder pour la fonction d'appel à l'API Distance Matrix
-  Future<String> _getEtaDescription() async {
-    // TODO: Implémenter l'appel réel à Google Distance Matrix API
-    // Pour l'instant, retourne une valeur factice
-    await Future.delayed(const Duration(milliseconds: 500)); // Simule un appel réseau
-    // Simuler une logique basée sur la distance brute (très approximatif)
-    // Position utilisateur factice pour l'exemple (devrait venir de Geolocator/état global)
-    final userLat = 5.3454;
-    final userLng = -4.0245;
-    final dLat = (commercant.localisation.latitude - userLat).abs();
-    final dLng = (commercant.localisation.longitude - userLng).abs();
-    final distance = dLat + dLng; // Approximation très grossière
-
-    if (distance < 0.01) return "Environ 5 min à pied";
-    if (distance < 0.05) return "Environ 10 min en voiture / 20 min à pied";
-    return "Plus de 15 min en voiture";
+  Widget _buildEtaDisplay(String title, Future<String> etaFuture) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        FutureBuilder<String>(
+          future: etaFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Row(
+                children: [
+                  SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                  SizedBox(width: 8),
+                  Text("Calcul en cours...")
+                ]
+              );
+            }
+            if (snapshot.hasError) {
+              return Text("Erreur ETA: ${snapshot.error}", style: const TextStyle(color: Colors.red));
+            }
+            if (!snapshot.hasData || snapshot.data == null || snapshot.data!.isEmpty) {
+                return const Text("Non disponible");
+            }
+            return Text(snapshot.data!);
+          },
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
   }
-
 
   @override
   Widget build(BuildContext context) {
-    Color statutColor = commercant.statutDisponibilite == StatutDisponibilite.disponible ? Colors.green :
-                        commercant.statutDisponibilite == StatutDisponibilite.epuise ? Colors.red : Colors.grey;
-    String statutText = commercant.statutDisponibilite == StatutDisponibilite.disponible ? 'Disponible' :
-                        commercant.statutDisponibilite == StatutDisponibilite.epuise ? 'Épuisé' : 'Inconnu';
+    Color statutColor = widget.commercant.statutDisponibilite == StatutDisponibilite.disponible ? Colors.green :
+                        widget.commercant.statutDisponibilite == StatutDisponibilite.epuise ? Colors.red : Colors.grey;
+    String statutText = widget.commercant.statutDisponibilite == StatutDisponibilite.disponible ? 'Disponible' :
+                        widget.commercant.statutDisponibilite == StatutDisponibilite.epuise ? 'Épuisé' : 'Inconnu';
 
-    String ouvertActuellementText = commercant.estOuvertMaintenant ? "Ouvert actuellement" : "Fermé actuellement";
-    Color ouvertColor = commercant.estOuvertMaintenant ? Colors.green.shade700 : Colors.red.shade700;
+    String ouvertActuellementText = widget.commercant.estOuvertMaintenant ? "Ouvert actuellement" : "Fermé actuellement";
+    Color ouvertColor = widget.commercant.estOuvertMaintenant ? Colors.green.shade700 : Colors.red.shade700;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(commercant.nom),
+        title: Text(widget.commercant.nom),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            if (commercant.imageUrl != null && commercant.imageUrl!.isNotEmpty)
+            if (widget.commercant.imageUrl != null && widget.commercant.imageUrl!.isNotEmpty)
               Center(
-                child: Hero( // Animation Hero pour l'image
-                  tag: 'commercantImage_${commercant.id}', // Tag unique
+                child: Hero(
+                  tag: 'commercantImage_${widget.commercant.id}',
                   child: Image.network(
-                    commercant.imageUrl!,
+                    widget.commercant.imageUrl!,
                     height: 200,
                     width: double.infinity,
                     fit: BoxFit.cover,
@@ -78,7 +159,7 @@ class CommercantDetailScreen extends StatelessWidget {
               ),
             const SizedBox(height: 16.0),
             Text(
-              commercant.nom,
+              widget.commercant.nom,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8.0),
@@ -86,13 +167,7 @@ class CommercantDetailScreen extends StatelessWidget {
               children: [
                 Icon(Icons.location_on, color: Theme.of(context).primaryColor),
                 const SizedBox(width: 8.0),
-                Expanded(child: Text(commercant.localisation.adresse ?? 'Adresse non disponible')),
-                // IconButton(icon: Icon(Icons.map), onPressed: () async {
-                //   final String googleMapsUrl = "https://www.google.com/maps/search/?api=1&query=${commercant.localisation.latitude},${commercant.localisation.longitude}";
-                //   if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
-                //     await launchUrl(Uri.parse(googleMapsUrl));
-                //   }
-                // })
+                Expanded(child: Text(widget.commercant.localisation.adresse ?? 'Adresse non disponible')),
               ],
             ),
             const SizedBox(height: 8.0),
@@ -100,15 +175,7 @@ class CommercantDetailScreen extends StatelessWidget {
               children: [
                 Icon(Icons.phone, color: Theme.of(context).primaryColor),
                 const SizedBox(width: 8.0),
-                Text(commercant.telephone ?? 'Numéro non disponible'),
-                // IconButton(icon: Icon(Icons.call), onPressed: () async {
-                //   if (commercant.telephone != null) {
-                //     final Uri launchUri = Uri(scheme: 'tel', path: commercant.telephone);
-                //     if (await canLaunchUrl(launchUri)) {
-                //        await launchUrl(launchUri);
-                //     }
-                //   }
-                // })
+                Text(widget.commercant.telephone ?? 'Numéro non disponible'),
               ],
             ),
             const SizedBox(height: 16.0),
@@ -132,20 +199,8 @@ class CommercantDetailScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16.0),
-            Text("Temps de trajet estimé (ETA):", style: Theme.of(context).textTheme.titleMedium),
-            FutureBuilder<String>(
-              future: _getEtaDescription(), // Appel de la fonction (actuellement factice)
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Row(children: [CircularProgressIndicator(strokeWidth: 2), SizedBox(width: 8), Text("Calcul en cours...")]);
-                }
-                if (snapshot.hasError) {
-                  return Text("Erreur ETA: ${snapshot.error}");
-                }
-                return Text(snapshot.data ?? "Non disponible");
-              },
-            ),
-            // TODO: Ajouter une petite carte statique Mapbox si pertinent ici (plus complexe)
+            _buildEtaDisplay("Temps de trajet (voiture):", _etaFutureVoiture!),
+            _buildEtaDisplay("Temps de trajet (marche):", _etaFuturePied!),
           ],
         ),
       ),
