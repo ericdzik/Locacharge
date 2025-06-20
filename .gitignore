@@ -49,3 +49,6 @@ app.*.symbols
 
 # ========== Git ==========
 *.orig
+
+# Application specific configuration files
+lib/core/config/app_config.dart
