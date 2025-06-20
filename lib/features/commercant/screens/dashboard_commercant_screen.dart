@@ -108,7 +108,7 @@ class _DashboardCommercantScreenState extends State<DashboardCommercantScreen> {
                 ))
               : _commercantData == null && _currentUserData?.role == UserRole.commercant
                   ? Center(child: Text(
-                      "Profil commerçant non trouvé pour ${firebaseUser.email}. Veuillez contacter l'administrateur."
+                      "Profil commerçant non trouvé pour l'utilisateur (${_currentUserData?.email ?? _currentUserData?.id ?? 'ID inconnu'}). Veuillez contacter l'administrateur."
                     ))
                   : _currentUserData?.role != UserRole.commercant
                      ? const Center(child: Text("Accès réservé aux commerçants."))
