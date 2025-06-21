@@ -11,6 +11,7 @@ import 'package:locacharge/core/models/localisation_model.dart';
 import 'package:locacharge/core/models/horaire_model.dart'; // Import HoraireModel
 import 'package:locacharge/features/home/screens/list_view_screen.dart'; // Import ListViewScreen
 import 'package:locacharge/features/home/screens/fiche_commercant_screen.dart'; // Import pour la navigation
+import 'package:locacharge/core/localization/manual_translations.dart'; // Importer ManualTranslations
 // Pour l'internationalisation (exemple)
 // import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
@@ -42,6 +43,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
+
+  final ManualTranslations _translations = ManualTranslations(const Locale('fr')); // Instance de traductions
 
   // États des filtres
   StatutDisponibilite? _selectedDisponibilite;
@@ -319,7 +322,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // final localizations = AppLocalizations.of(context)!;
+    // final localizations = AppLocalizations.of(context)!; // Supprimé pour l'instant
 
     if (AppConfig.mapboxAccessToken == 'YOUR_MAPBOX_ACCESS_TOKEN_HERE' || AppConfig.mapboxAccessToken.isEmpty) {
        return const Scaffold(
@@ -338,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("LocaCharge"),
+        title: Text(_translations.translate('homeScreenTitle')),
         actions: [
           IconButton(
             icon: const Icon(Icons.my_location),
@@ -356,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: "Rechercher une boutique, un quartier...",
+                    hintText: _translations.translate('searchHintText'),
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8.0),
