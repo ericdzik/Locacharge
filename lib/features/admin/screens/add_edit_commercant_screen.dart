@@ -166,7 +166,7 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
                     ),
                     TextFormField(
                       controller: _imageUrlController,
-                      decoration: const InputDecoration(labelText: 'URL de l\'image'),
+                      decoration: const InputDecoration(labelText: 'URL de l'image'),
                     ),
                     DropdownButtonFormField<StatutDisponibilite>(
                       value: _statutDisponibilite,
