@@ -34,7 +34,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 // ou un commentaire pour le moment si le fichier n'existe pas encore.
 // Pour les besoins de la sous-tâche, nous allons supposer que l'utilisateur
 // exécutera `flutter gen-l10n` et que l'import suivant fonctionnera:
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+
 
 
 void main() async {
