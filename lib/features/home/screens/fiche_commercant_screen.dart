@@ -4,7 +4,7 @@ import 'package:locacharge/core/models/commercant_model.dart';
 import 'package:locacharge/core/models/horaire_model.dart';
 import 'package:locacharge/core/services/maps_service.dart'; // Importer le service MapsService
 import 'package:locacharge/core/models/eta_result_model.dart'; // Importer EtaResult
-import 'package:mapbox_gl/mapbox_gl.dart'; // Pour LatLng
+import 'package:latlong2/latlong.dart' as latlong; // Pour LatLng avec flutter_map
 import 'package:geolocator/geolocator.dart'; // Pour la position utilisateur
 
 class CommercantDetailScreen extends StatefulWidget {
@@ -46,36 +46,37 @@ class _CommercantDetailScreenState extends State<CommercantDetailScreen> {
     // Pas besoin de setState ici car _etaFutureVoiture et _etaFuturePied sont des Futures
     // et le FutureBuilder réagira à leur changement d'état.
     // On assigne directement les futures.
-    _etaFutureVoiture = _getEtaDescriptionWithProfile('mapbox/driving-traffic');
-    _etaFuturePied = _getEtaDescriptionWithProfile('mapbox/walking');
+    _etaFutureVoiture = _getEtaDescriptionWithProfile('car'); // Profil OSRM pour voiture
+    _etaFuturePied = _getEtaDescriptionWithProfile('foot');   // Profil OSRM pour piéton
   }
 
-  Future<String> _getEtaDescriptionWithProfile(String mapboxProfile) async {
+  Future<String> _getEtaDescriptionWithProfile(String osrmProfile) async {
     final Position? userPosition = await _getCurrentPosition();
 
     if (userPosition == null) {
       return "Position utilisateur inconnue";
     }
 
-    final LatLng origin = LatLng(userPosition.latitude, userPosition.longitude);
-    final LatLng destination = LatLng(widget.commercant.localisation.latitude, widget.commercant.localisation.longitude);
+    final latlong.LatLng origin = latlong.LatLng(userPosition.latitude, userPosition.longitude);
+    final latlong.LatLng destination = latlong.LatLng(widget.commercant.localisation.latitude, widget.commercant.localisation.longitude);
 
     try {
-      final EtaResult? etaResult = await _mapsService.getEtaFromMapbox(origin, destination, mapboxProfile);
+      // Utiliser la nouvelle méthode du service pour OSRM
+      final EtaResult? etaResult = await _mapsService.getEtaFromOSRM(origin, destination, osrmProfile);
       if (etaResult != null) {
         String profileText = "";
-        if (mapboxProfile.contains("driving")) {
+        if (osrmProfile == "car") { // Correspond au profil OSRM 'car'
           profileText = "en voiture";
-        } else if (mapboxProfile.contains("walking")) {
+        } else if (osrmProfile == "foot") { // Correspond au profil OSRM 'foot'
           profileText = "à pied";
         }
         return "Environ ${etaResult.durationFormatted} (${etaResult.distanceFormatted}) $profileText";
       } else {
-        return "ETA non disponible ($mapboxProfile)";
+        return "ETA non disponible ($osrmProfile)";
       }
     } catch (e) {
-      print("Erreur calcul ETA ($mapboxProfile): $e");
-      return "Erreur calcul ETA ($mapboxProfile)";
+      print("Erreur calcul ETA ($osrmProfile): $e");
+      return "Erreur calcul ETA ($osrmProfile)";
     }
   }
 

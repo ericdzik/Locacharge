@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Pour SystemChannels
 import 'package:geolocator/geolocator.dart';
-import 'package:mapbox_gl/mapbox_gl.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as latlong; // Utilisé pour les objets LatLng de flutter_map
 import 'package:locacharge/core/config/app_config.dart';
 import 'package:locacharge/core/models/commercant_model.dart';
 import 'package:locacharge/core/models/localisation_model.dart';
 import 'package:locacharge/core/models/horaire_model.dart'; // Import HoraireModel
 import 'package:locacharge/features/home/screens/list_view_screen.dart'; // Import ListViewScreen
+import 'package:locacharge/features/home/screens/fiche_commercant_screen.dart'; // Import pour la navigation
 // Pour l'internationalisation (exemple)
 // import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
@@ -30,9 +32,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  MapboxMapController? _mapController;
-  LatLng _initialCameraPosition = const LatLng(5.3454, -4.0245); // Abidjan
+  MapController _mapController = MapController();
+  latlong.LatLng _initialCameraPosition = const latlong.LatLng(5.3454, -4.0245); // Abidjan
   bool _myLocationEnabled = false;
+  latlong.LatLng? _currentPositionMarker; // Pour stocker la position actuelle de l'utilisateur
 
   List<CommercantModel> _allCommercants = []; // Tous les commerçants chargés
   List<CommercantModel> _filteredCommercants = []; // Commerçants après recherche et filtres
@@ -47,9 +50,20 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // _mapController = MapController(); // Initialisation ici si non fait à la déclaration
     _requestLocationPermission();
     _fetchMockCommercants();
     _searchController.addListener(_onSearchChanged);
+
+    // Appeler les actions initiales après le premier frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) { // Vérifier si le widget est toujours monté
+        _applyFiltersAndSearch(); // Pour afficher les symboles initiaux si nécessaire
+        if (_myLocationEnabled) {
+          _getCurrentLocationAndCenterMap();
+        }
+      }
+    });
   }
 
   @override
@@ -57,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _debounce?.cancel();
-    _mapController?.dispose(); // Dispose map controller
+    // _mapController.dispose(); // MapController n'a pas de méthode dispose publique typique comme les contrôleurs de texte.
     super.dispose();
   }
 
@@ -114,23 +128,31 @@ class _HomeScreenState extends State<HomeScreen> {
             const SnackBar(content: Text('Permission de localisation refusée.')),
           );
         }
-        setState(() { _myLocationEnabled = false; });
+        setState(() {
+          _myLocationEnabled = false;
+          _currentPositionMarker = null; // Cacher le marqueur si permission refusée
+        });
         return;
       }
     }
 
     if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-      setState(() { _myLocationEnabled = true; });
-      _getCurrentLocationAndCenterMap();
+      setState(() {
+        _myLocationEnabled = true;
+      });
+      _getCurrentLocationAndCenterMap(); // Obtenir la position et afficher le marqueur
     }
   }
 
   Future<void> _getCurrentLocationAndCenterMap() async {
-    if (!_myLocationEnabled || _mapController == null) return;
+    if (!_myLocationEnabled) return;
     try {
       Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      _initialCameraPosition = LatLng(position.latitude, position.longitude);
-      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0));
+      setState(() {
+        _initialCameraPosition = latlong.LatLng(position.latitude, position.longitude);
+        _currentPositionMarker = _initialCameraPosition; // Mettre à jour la position du marqueur
+      });
+      _mapController.move(_initialCameraPosition, 14.0); // Centrer la carte
     } catch (e) {
       print("Erreur lors de la récupération de la position: $e");
       if (mounted) {
@@ -139,18 +161,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _onMapCreated(MapboxMapController controller) {
-    _mapController = controller;
-    _applyFiltersAndSearch();
-    if (_myLocationEnabled) {
-       _getCurrentLocationAndCenterMap();
-    }
-  }
+  // void _onMapCreated(MapboxMapController controller) { // Remplacé par l'initialisation directe du MapController
+  //   _mapController = controller;
+  //   _applyFiltersAndSearch();
+  //   if (_myLocationEnabled) {
+  //      _getCurrentLocationAndCenterMap();
+  //   }
+  // }
 
-  void _onStyleLoadedCallback() {
-    print("Style de carte chargé.");
-    _applyFiltersAndSearch();
-  }
+  // _onStyleLoadedCallback n'est plus nécessaire pour flutter_map avec TileLayer simple.
 
   void _onSearchChanged() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
@@ -177,35 +196,53 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return matchesSearch && matchesDisponibilite && matchesOuverture;
       }).toList();
-      _addOrUpdateCommercantSymbols();
+      // L'appel à _buildCommercantMarkersList sera fait directement dans le build du MarkerLayer
     });
   }
 
-  void _addOrUpdateCommercantSymbols() {
-    if (_mapController == null) return;
+  List<Marker> _buildCommercantMarkersList(List<CommercantModel> commercants) {
+    return commercants.map((commercant) {
+      Color markerColor = Colors.grey; // Couleur par défaut pour statut inconnu
+      IconData markerIcon = Icons.store_mall_directory; // Icône par défaut
 
-    _mapController?.clearSymbols();
-
-    for (var commercant in _filteredCommercants) {
-      Color symbolColor = Colors.grey;
       if (commercant.statutDisponibilite == StatutDisponibilite.disponible) {
-        symbolColor = Colors.green;
+        markerColor = Colors.green;
+        markerIcon = Icons.store_mall_directory; // Ou une autre icône pour disponible
       } else if (commercant.statutDisponibilite == StatutDisponibilite.epuise) {
-        symbolColor = Colors.red;
+        markerColor = Colors.red;
+        markerIcon = Icons.error; // Ou une autre icône pour épuisé
       }
 
-      _mapController?.addSymbol(
-        SymbolOptions(
-          geometry: LatLng(commercant.localisation.latitude, commercant.localisation.longitude),
-          iconColor: symbolColor.toHexStringRGB(),
-          iconImage: "circle-15",
-          iconSize: 1.5,
-          textField: commercant.nom,
-          textOffset: const Offset(0, 1.5),
+      return Marker(
+        width: 80.0,
+        height: 80.0,
+        point: latlong.LatLng(commercant.localisation.latitude, commercant.localisation.longitude),
+        child: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CommercantDetailScreen(commercant: commercant),
+              ),
+            );
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(markerIcon, color: markerColor, size: 30.0),
+              // Optionnel: Afficher le nom du commerçant sous l'icône
+              // Text(
+              //   commercant.nom,
+              //   style: TextStyle(fontSize: 10, color: Colors.black, fontWeight: FontWeight.bold),
+              //   overflow: TextOverflow.ellipsis,
+              //   textAlign: TextAlign.center,
+              // ),
+            ],
+          ),
         ),
-        // {'commercantId': commercant.id}
+        // anchorPos: AnchorPos.align(AnchorAlign.top), // Ajuster si le texte est sous l'icône
       );
-    }
+    }).toList();
   }
 
   Widget _buildFilterChips() {
@@ -336,17 +373,32 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      body: MapboxMap(
-        accessToken: AppConfig.mapboxAccessToken,
-        onMapCreated: _onMapCreated,
-        onStyleLoadedCallback: _onStyleLoadedCallback,
-        initialCameraPosition: CameraPosition(
-          target: _initialCameraPosition,
-          zoom: 11.0,
+      body: FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: _initialCameraPosition, // Type latlong.LatLng
+          initialZoom: 11.0,
+          // onMapEvent: _onMapEvent, // Si besoin de gérer les événements de la carte
+          // onTap: _onTap, // Si besoin de gérer les clics sur la carte
         ),
-        myLocationEnabled: _myLocationEnabled,
-        myLocationTrackingMode: _myLocationEnabled ? MyLocationTrackingMode.Tracking : MyLocationTrackingMode.None,
-        // styleString: MapboxStyles.MAPBOX_STREETS,
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.example.locacharge',
+          ),
+          MarkerLayer(
+            markers: [
+              if (_myLocationEnabled && _currentPositionMarker != null)
+                Marker(
+                  point: _currentPositionMarker!,
+                  width: 80.0,
+                  height: 80.0,
+                  child: Icon(Icons.my_location, color: Colors.blue.shade700, size: 30.0),
+                ),
+              ..._buildCommercantMarkersList(_filteredCommercants), // Ajoute les marqueurs des commerçants
+            ],
+          ),
+        ],
       ),
     );
   }
