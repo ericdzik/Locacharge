@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../core/services/auth_service.dart';
+import 'package:locacharge/core/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:locacharge/core/services/user_service.dart';
+import 'package:locacharge/features/auth/screens/login_redirect_logic.dart';
+import 'package:locacharge/features/auth/screens/role_selection_screen.dart'; // Ajouter RoleSelectionScreen
 
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
@@ -12,6 +15,7 @@ class LoginForm extends StatefulWidget {
 class _LoginFormState extends State<LoginForm> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _userService = UserService(); // Instancier UserService
   bool _isLoading = false;
   String? _error;
 
@@ -31,11 +35,16 @@ class _LoginFormState extends State<LoginForm> {
 
     try {
       await AuthService().signInWithEmail(email, password);
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, "/home");
+      final firebaseUser = AuthService().currentUser; // Récupérer l'utilisateur Firebase
+      if (mounted && firebaseUser != null) {
+        // Appeler la logique de redirection
+        await LoginRedirectLogic.handleLoginSuccess(context, firebaseUser, _userService);
+      } else if (mounted) {
+        // Cas où firebaseUser est null après une tentative de connexion réussie (improbable)
+        setState(() => _error = "Erreur de récupération de l'utilisateur après connexion.");
       }
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -139,11 +148,20 @@ SizedBox(
       setState(() => _isLoading = true);
       try {
         final userCredential = await AuthService().signInWithGoogle();
-        if (userCredential != null && mounted) {
-          Navigator.pushReplacementNamed(context, '/home');
+        final firebaseUser = userCredential?.user; // Récupérer l'utilisateur Firebase
+        if (mounted && firebaseUser != null) {
+          // Appeler la logique de redirection
+          await LoginRedirectLogic.handleLoginSuccess(context, firebaseUser, _userService);
+        } else if (mounted) {
+          // Cas où firebaseUser est null (connexion Google annulée ou échouée)
+           if (userCredential == null) { // Si userCredential lui-même est null (connexion annulée par exemple)
+             // Pas besoin de message d'erreur spécifique, l'utilisateur a annulé
+           } else {
+            setState(() => _error = "Échec de la connexion Google ou utilisateur non trouvé.");
+           }
         }
       } catch (e) {
-        setState(() => _error = "Échec de la connexion Google");
+        if (mounted) setState(() => _error = "Échec de la connexion Google: $e");
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -161,7 +179,10 @@ SizedBox(
 
                 TextButton(
                   onPressed: () {
-                    Navigator.pushNamed(context, "/signup");
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
+                    );
                   },
                   child: const Text("Pas encore de compte ? S'inscrire"),
                 )
