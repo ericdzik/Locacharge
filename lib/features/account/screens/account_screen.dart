@@ -1,8 +1,10 @@
 // lib/features/account/screens/account_screen.dart
 import 'package:flutter/material.dart';
-// Import AuthService pour la déconnexion
-// import 'package:locacharge/core/services/auth_service.dart';
-// import 'package:provider/provider.dart'; // Si vous utilisez Provider pour AuthService
+import 'package:go_router/go_router.dart';
+import 'package:locacharge/core/models/role_enum.dart';
+import 'package:locacharge/core/models/user_model.dart';
+import 'package:locacharge/core/services/auth_service.dart';
+import 'package:locacharge/core/services/user_service.dart';
 import 'package:locacharge/shared/styles/colors.dart';
 import 'package:locacharge/shared/widgets/modern_card.dart';
 import 'package:locacharge/shared/widgets/modern_buttons.dart';
@@ -12,12 +14,66 @@ import 'package:locacharge/shared/widgets/modern_input_fields.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
-class AccountScreen extends StatelessWidget {
+class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
 
   @override
+  State<AccountScreen> createState() => _AccountScreenState();
+}
+
+class _AccountScreenState extends State<AccountScreen> {
+  final AuthService _authService = AuthService();
+  final UserService _userService = UserService();
+  UserModel? _userModel;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    final firebaseUser = _authService.currentUser;
+    if (firebaseUser != null) {
+      try {
+        final user = await _userService.getUserById(firebaseUser.uid);
+        if (mounted) {
+          setState(() {
+            _userModel = user;
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur de chargement des données utilisateur: $e')),
+          );
+        }
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        // L'utilisateur n'est pas connecté, GoRouter devrait gérer la redirection
+        // ou le splash screen. Si on arrive ici, c'est un état inattendu.
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Utilisateur non connecté.')),
+        );
+        context.go('/login');
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // final authService = Provider.of<AuthService>(context, listen: false); // Exemple avec Provider
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mon Compte',
@@ -28,53 +84,68 @@ class AccountScreen extends StatelessWidget {
         iconTheme: const IconThemeData(color: AppColors.primaryColor),
       ),
       backgroundColor: AppColors.backgroundColor,
-      body: Center(
-        child: ModernCard(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Icon(Icons.person, color: AppColors.primaryColor, size: 56),
-              const SizedBox(height: 16),
-              const Text(
-                'Mon profil',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primaryColor,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Page de compte (Prochainement)',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppColors.textSecondary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              ModernPrimaryButton(
-                text: 'Déconnexion (TODO)',
-                icon: Icons.logout,
-                onPressed: () async {
-                  // Logique de déconnexion
-                  // await authService.signOut();
-                  // TODO: Naviguer vers l'écran de connexion après déconnexion
-                  // Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text(
-                              'Fonctionnalité de déconnexion à implémenter.')),
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 24),
-              ModernSecondaryButton(
-                text: 'Devenir commerçant',
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _userModel == null
+              ? const Center(child: Text("Impossible de charger les informations du profil."))
+              : Center(
+                  child: ModernCard(
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.person, color: AppColors.primaryColor, size: 56),
+                        const SizedBox(height: 16),
+                        Text(
+                          _userModel?.nomComplet ?? 'Nom non disponible',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                         Text(
+                          _userModel?.email ?? 'Email non disponible',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        if (_userModel?.telephone != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _userModel!.telephone!,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 32),
+                        ModernPrimaryButton(
+                          text: 'Déconnexion',
+                          icon: Icons.logout,
+                          onPressed: () async {
+                            try {
+                              await _authService.signOut();
+                              if (mounted) {
+                                context.go('/login');
+                              }
+                            } catch (e) {
+                               if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Erreur de déconnexion: $e')),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        if (_userModel?.role != UserRole.commercant)
+                          ModernSecondaryButton(
+                            text: 'Devenir commerçant',
                 icon: Icons.store,
                 onPressed: () async {
                   showModalBottomSheet(
@@ -88,13 +159,16 @@ class AccountScreen extends StatelessWidget {
                   );
                 },
               ),
-            ],
-          ),
-        ),
-      ),
+                        // TODO: Ajouter un bouton "Voir mon espace commerçant" si _userModel.role == UserRole.commercant
+                      ],
+                    ),
+                  ),
+                ),
     );
   }
 }
+
+// Le reste du fichier (_DevenirCommercantForm, _CarteSelectionWidget) reste inchangé pour l'instant.
 
 class _DevenirCommercantForm extends StatefulWidget {
   @override
