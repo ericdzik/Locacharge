@@ -9,14 +9,14 @@ import 'package:locacharge/core/services/commercant_service.dart';
 // import 'package:locacharge/core/models/user_model.dart'; // Pour créer le user Firestore (TODO)
 // import 'package:locacharge/core/models/role_enum.dart'; // Pour créer le user Firestore (TODO)
 
-
 class AddEditCommercantScreen extends StatefulWidget {
   final CommercantModel? commercantToEdit; // Null pour l'ajout
 
   const AddEditCommercantScreen({super.key, this.commercantToEdit});
 
   @override
-  State<AddEditCommercantScreen> createState() => _AddEditCommercantScreenState();
+  State<AddEditCommercantScreen> createState() =>
+      _AddEditCommercantScreenState();
 }
 
 class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
@@ -26,7 +26,8 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
   // final UserService _userService = UserService(); // TODO
 
   late TextEditingController _nomController;
-  late TextEditingController _userIdController; // UID de l'utilisateur Firebase associé
+  late TextEditingController
+      _userIdController; // UID de l'utilisateur Firebase associé
   late TextEditingController _latController;
   late TextEditingController _lonController;
   late TextEditingController _adresseController;
@@ -41,13 +42,20 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
   void initState() {
     super.initState();
     _nomController = TextEditingController(text: widget.commercantToEdit?.nom);
-    _userIdController = TextEditingController(text: widget.commercantToEdit?.id); // ID du commerçant est l'UID
-    _latController = TextEditingController(text: widget.commercantToEdit?.localisation.latitude.toString());
-    _lonController = TextEditingController(text: widget.commercantToEdit?.localisation.longitude.toString());
-    _adresseController = TextEditingController(text: widget.commercantToEdit?.localisation.adresse);
-    _telController = TextEditingController(text: widget.commercantToEdit?.telephone);
-    _imageUrlController = TextEditingController(text: widget.commercantToEdit?.imageUrl);
-    _statutDisponibilite = widget.commercantToEdit?.statutDisponibilite ?? StatutDisponibilite.inconnu;
+    _userIdController = TextEditingController(
+        text: widget.commercantToEdit?.id); // ID du commerçant est l'UID
+    _latController = TextEditingController(
+        text: widget.commercantToEdit?.localisation.latitude.toString());
+    _lonController = TextEditingController(
+        text: widget.commercantToEdit?.localisation.longitude.toString());
+    _adresseController = TextEditingController(
+        text: widget.commercantToEdit?.localisation.adresse);
+    _telController =
+        TextEditingController(text: widget.commercantToEdit?.telephone);
+    _imageUrlController =
+        TextEditingController(text: widget.commercantToEdit?.imageUrl);
+    _statutDisponibilite = widget.commercantToEdit?.statutDisponibilite ??
+        StatutDisponibilite.inconnu;
 
     // if (widget.commercantToEdit != null && _userIdController.text.isNotEmpty) {
     //   // _userIdController.enabled = false; // Ne pas permettre de modifier l'UID si édition
@@ -71,11 +79,15 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
       return;
     }
     if (_userIdController.text.trim().isEmpty) {
-        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("L'ID utilisateur (UID Firebase) est requis.")));
-        return;
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("L'ID utilisateur (UID Firebase) est requis.")));
+      return;
     }
 
-    setState(() { _isLoading = true; });
+    setState(() {
+      _isLoading = true;
+    });
 
     // SIMPLIFICATION: Création du compte Firebase Auth et du document user associé est un TODO.
     // On suppose que l'UID fourni dans _userIdController existe déjà dans Firebase Auth
@@ -88,10 +100,12 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
     );
 
     // TODO: Ajouter une UI pour gérer les horaires
-    final horaires = widget.commercantToEdit?.horaires ?? <HoraireModel>[
-        // Horaire par défaut si nouveau, à améliorer
-        HoraireModel(jour: "Lundi-Vendredi", ouverture: "09:00", fermeture: "18:00")
-    ];
+    final horaires = widget.commercantToEdit?.horaires ??
+        <HoraireModel>[
+          // Horaire par défaut si nouveau, à améliorer
+          HoraireModel(
+              jour: "Lundi-Vendredi", ouverture: "09:00", fermeture: "18:00")
+        ];
 
     final commercant = CommercantModel(
       id: _userIdController.text.trim(), // UID de l'utilisateur Firebase
@@ -102,20 +116,29 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
       imageUrl: _imageUrlController.text,
       statutDisponibilite: _statutDisponibilite,
       estActif: widget.commercantToEdit?.estActif ?? true, // par défaut actif
+      dateCreation: widget.commercantToEdit?.dateCreation ?? DateTime.now(),
+      dateModification: DateTime.now(),
     );
 
     try {
       await _commercantService.createOrUpdateCommercant(commercant);
-      if(mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Commerçant ${widget.commercantToEdit == null ? "ajouté" : "modifié"} avec succès!')),
+          SnackBar(
+              content: Text(
+                  'Commerçant ${widget.commercantToEdit == null ? "ajouté" : "modifié"} avec succès!')),
         );
         Navigator.of(context).pop();
       }
     } catch (e) {
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("Erreur: $e")));
     } finally {
-      if(mounted) setState(() { _isLoading = false; });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+        });
     }
   }
 
@@ -123,7 +146,9 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.commercantToEdit == null ? 'Ajouter Commerçant' : 'Modifier Commerçant'),
+        title: Text(widget.commercantToEdit == null
+            ? 'Ajouter Commerçant'
+            : 'Modifier Commerçant'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -135,26 +160,39 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
                   children: <Widget>[
                     TextFormField(
                       controller: _userIdController,
-                      decoration: const InputDecoration(labelText: 'ID Utilisateur (Firebase UID)'),
-                      validator: (value) => value!.isEmpty ? 'Champ requis' : null,
-                      enabled: widget.commercantToEdit == null, // Non modifiable si édition
+                      decoration: const InputDecoration(
+                          labelText: 'ID Utilisateur (Firebase UID)'),
+                      validator: (value) =>
+                          value!.isEmpty ? 'Champ requis' : null,
+                      enabled: widget.commercantToEdit ==
+                          null, // Non modifiable si édition
                     ),
                     TextFormField(
                       controller: _nomController,
-                      decoration: const InputDecoration(labelText: 'Nom du commerçant'),
-                      validator: (value) => value!.isEmpty ? 'Champ requis' : null,
+                      decoration:
+                          const InputDecoration(labelText: 'Nom du commerçant'),
+                      validator: (value) =>
+                          value!.isEmpty ? 'Champ requis' : null,
                     ),
                     TextFormField(
                       controller: _latController,
                       decoration: const InputDecoration(labelText: 'Latitude'),
                       keyboardType: TextInputType.number,
-                      validator: (value) => value!.isEmpty ? 'Champ requis' : (double.tryParse(value) == null ? 'Nombre invalide' : null),
+                      validator: (value) => value!.isEmpty
+                          ? 'Champ requis'
+                          : (double.tryParse(value) == null
+                              ? 'Nombre invalide'
+                              : null),
                     ),
                     TextFormField(
                       controller: _lonController,
                       decoration: const InputDecoration(labelText: 'Longitude'),
                       keyboardType: TextInputType.number,
-                      validator: (value) => value!.isEmpty ? 'Champ requis' : (double.tryParse(value) == null ? 'Nombre invalide' : null),
+                      validator: (value) => value!.isEmpty
+                          ? 'Champ requis'
+                          : (double.tryParse(value) == null
+                              ? 'Nombre invalide'
+                              : null),
                     ),
                     TextFormField(
                       controller: _adresseController,
@@ -166,12 +204,15 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
                     ),
                     TextFormField(
                       controller: _imageUrlController,
-                      decoration: const InputDecoration(labelText: 'URL de l'image'),
+                      decoration:
+                          const InputDecoration(labelText: "URL de l'image"),
                     ),
                     DropdownButtonFormField<StatutDisponibilite>(
                       value: _statutDisponibilite,
-                      decoration: const InputDecoration(labelText: 'Statut de disponibilité'),
-                      items: StatutDisponibilite.values.map((StatutDisponibilite statut) {
+                      decoration: const InputDecoration(
+                          labelText: 'Statut de disponibilité'),
+                      items: StatutDisponibilite.values
+                          .map((StatutDisponibilite statut) {
                         return DropdownMenuItem<StatutDisponibilite>(
                           value: statut,
                           child: Text(statut.toString().split('.').last),
@@ -179,14 +220,18 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
                       }).toList(),
                       onChanged: (StatutDisponibilite? newValue) {
                         if (newValue != null) {
-                          setState(() { _statutDisponibilite = newValue; });
+                          setState(() {
+                            _statutDisponibilite = newValue;
+                          });
                         }
                       },
                     ),
                     const SizedBox(height: 20),
                     ElevatedButton(
                       onPressed: _saveCommercant,
-                      child: Text(widget.commercantToEdit == null ? 'Ajouter' : 'Sauvegarder'),
+                      child: Text(widget.commercantToEdit == null
+                          ? 'Ajouter'
+                          : 'Sauvegarder'),
                     ),
                   ],
                 ),

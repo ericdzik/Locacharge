@@ -3,24 +3,23 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Pour SystemChannels
 import 'package:geolocator/geolocator.dart';
-import 'package:mapbox_gl/mapbox_gl.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:locacharge/core/config/app_config.dart';
 import 'package:locacharge/core/models/commercant_model.dart';
 import 'package:locacharge/core/models/localisation_model.dart';
 import 'package:locacharge/core/models/horaire_model.dart'; // Import HoraireModel
+import 'package:locacharge/core/models/produit_model.dart'; // Import ProduitModel
+import 'package:locacharge/core/services/commercant_service.dart'; // Import CommercantService
+import 'package:locacharge/core/services/history_service.dart'; // Import HistoryService
 import 'package:locacharge/features/home/screens/list_view_screen.dart'; // Import ListViewScreen
+import 'package:locacharge/shared/styles/colors.dart';
+import 'package:go_router/go_router.dart';
+import 'package:locacharge/shared/widgets/modern_card.dart';
+import 'package:locacharge/shared/widgets/modern_buttons.dart';
+import 'package:locacharge/shared/widgets/modern_input_fields.dart';
 // Pour l'internationalisation (exemple)
 // import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-
-
-// (ColorToString extension from previous step should be here or in a utils file)
-extension ColorToString on Color {
-  String toHexStringRGB() {
-    return '#${red.toRadixString(16).padLeft(2, '0')}'
-           '${green.toRadixString(16).padLeft(2, '0')}'
-           '${blue.toRadixString(16).padLeft(2, '0')}';
-  }
-}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,26 +29,44 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  MapboxMapController? _mapController;
+  MapController? _mapController;
   LatLng _initialCameraPosition = const LatLng(5.3454, -4.0245); // Abidjan
   bool _myLocationEnabled = false;
 
-  List<CommercantModel> _allCommercants = []; // Tous les commerçants chargés
-  List<CommercantModel> _filteredCommercants = []; // Commerçants après recherche et filtres
-
+  final CommercantService _commercantService = CommercantService();
+  final HistoryService _historyService = HistoryService();
+  List<CommercantModel> _commercants = [];
+  List<CommercantModel> _filteredCommercants = [];
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
 
-  // États des filtres
-  StatutDisponibilite? _selectedDisponibilite;
-  bool? _selectedOuverture; // true pour ouvert, false pour fermé, null pour pas de filtre
+  // Nouveaux états de filtre pour les checkboxes
+  final Map<String, bool> _filters = {
+    'recharge': false,
+    'transfert': false,
+    'sim': false,
+    'ouvert': false,
+  };
+
+  bool _isLoading = true;
+  String _selectedFilter = 'Tous';
+
+  final List<String> _filtersList = [
+    'Tous',
+    'Recharge',
+    'Services',
+    'Proximité'
+  ];
 
   @override
   void initState() {
     super.initState();
+    _mapController = MapController();
     _requestLocationPermission();
-    _fetchMockCommercants();
+    _applyFiltersAndSearch(); // Charger initialement les données
     _searchController.addListener(_onSearchChanged);
+    _loadCommercants();
+    _loadRecentSearches();
   }
 
   @override
@@ -57,70 +74,19 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _debounce?.cancel();
-    _mapController?.dispose(); // Dispose map controller
+    _mapController?.dispose();
     super.dispose();
-  }
-
-  void _fetchMockCommercants() {
-    Future.delayed(const Duration(seconds: 1), () {
-      if (!mounted) return;
-      setState(() {
-        _allCommercants = [
-          CommercantModel(
-            id: '1',
-            nom: 'Boutique Chez Ali',
-            localisation: LocalisationModel(latitude: 5.3550, longitude: -4.0200, adresse: "Treichville Centre"),
-            horaires: [HoraireModel(jour: "Lundi", ouverture: "08:00", fermeture: "19:00")], // Exemple
-            statutDisponibilite: StatutDisponibilite.disponible,
-            telephone: "0102030405"
-          ),
-          CommercantModel(
-            id: '2',
-            nom: 'Station Service Shell Cocody',
-            localisation: LocalisationModel(latitude: 5.3600, longitude: -3.9900, adresse: "Cocody Danga"),
-            horaires: [HoraireModel(jour: "Mardi", ouverture: "00:00", fermeture: "23:59", estOuvert24h: true)], // Ouvert 24h
-            statutDisponibilite: StatutDisponibilite.epuise,
-            telephone: "0506070809"
-          ),
-          CommercantModel(
-            id: '3',
-            nom: 'Le Kiosque Orange Money Marcory',
-            localisation: LocalisationModel(latitude: 5.3480, longitude: -4.0280, adresse: "Marcory Remblais"),
-            horaires: [HoraireModel(jour: "Mercredi", ouverture: "10:00", fermeture: "17:00")], // Supposons fermé actuellement pour test
-            statutDisponibilite: StatutDisponibilite.disponible,
-            telephone: "0708090001"
-          ),
-           CommercantModel(
-            id: '4',
-            nom: 'Pharmacie de la Savane',
-            localisation: LocalisationModel(latitude: 5.3510, longitude: -4.0150, adresse: "Treichville Savane"),
-            horaires: [HoraireModel(jour: "Jeudi", ouverture: "08:00", fermeture: "22:00")],
-            statutDisponibilite: StatutDisponibilite.disponible,
-            telephone: "0700000001"
-          ),
-        ];
-        _applyFiltersAndSearch();
-      });
-    });
   }
 
   Future<void> _requestLocationPermission() async {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Permission de localisation refusée.')),
-          );
-        }
-        setState(() { _myLocationEnabled = false; });
-        return;
-      }
     }
-
-    if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-      setState(() { _myLocationEnabled = true; });
+    if (mounted &&
+        (permission == LocationPermission.whileInUse ||
+            permission == LocationPermission.always)) {
+      setState(() => _myLocationEnabled = true);
       _getCurrentLocationAndCenterMap();
     }
   }
@@ -128,225 +94,509 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _getCurrentLocationAndCenterMap() async {
     if (!_myLocationEnabled || _mapController == null) return;
     try {
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      _initialCameraPosition = LatLng(position.latitude, position.longitude);
-      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0));
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+      _mapController?.move(LatLng(position.latitude, position.longitude), 14.0);
     } catch (e) {
-      print("Erreur lors de la récupération de la position: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Impossible de récupérer la position: $e')));
-      }
+      print("Erreur de géolocalisation: $e");
     }
-  }
-
-  void _onMapCreated(MapboxMapController controller) {
-    _mapController = controller;
-    _applyFiltersAndSearch();
-    if (_myLocationEnabled) {
-       _getCurrentLocationAndCenterMap();
-    }
-  }
-
-  void _onStyleLoadedCallback() {
-    print("Style de carte chargé.");
-    _applyFiltersAndSearch();
   }
 
   void _onSearchChanged() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      _applyFiltersAndSearch();
-    });
+    _debounce =
+        Timer(const Duration(milliseconds: 500), _applyFiltersAndSearch);
   }
 
-  void _applyFiltersAndSearch() {
+  Future<void> _applyFiltersAndSearch() async {
     if (!mounted) return;
-    String query = _searchController.text.toLowerCase();
+    setState(() => _isLoading = true);
 
-    setState(() {
-      _filteredCommercants = _allCommercants.where((commercant) {
-        final bool matchesSearch = query.isEmpty ||
-            commercant.nom.toLowerCase().contains(query) ||
-            (commercant.localisation.adresse?.toLowerCase().contains(query) ?? false);
+    try {
+      List<TypeProduit> typesProduit = [];
+      if (_filters['recharge']!)
+        typesProduit.add(TypeProduit.rechargeTelephonique);
+      if (_filters['transfert']!) typesProduit.add(TypeProduit.mobileMoney);
 
-        final bool matchesDisponibilite = _selectedDisponibilite == null ||
-            commercant.statutDisponibilite == _selectedDisponibilite;
+      List<String> services = [];
+      if (_filters['sim']!) services.add('sim');
 
-        final bool matchesOuverture = _selectedOuverture == null ||
-             (_selectedOuverture == true ? commercant.estOuvertMaintenant : !commercant.estOuvertMaintenant);
+      final commercants = await _commercantService.searchCommercants(
+        query: _searchController.text.isEmpty ? null : _searchController.text,
+        estOuvert: _filters['ouvert']! ? true : null,
+        typesProduit: typesProduit,
+        services: services,
+      );
 
-        return matchesSearch && matchesDisponibilite && matchesOuverture;
-      }).toList();
-      _addOrUpdateCommercantSymbols();
-    });
-  }
-
-  void _addOrUpdateCommercantSymbols() {
-    if (_mapController == null) return;
-
-    _mapController?.clearSymbols();
-
-    for (var commercant in _filteredCommercants) {
-      Color symbolColor = Colors.grey;
-      if (commercant.statutDisponibilite == StatutDisponibilite.disponible) {
-        symbolColor = Colors.green;
-      } else if (commercant.statutDisponibilite == StatutDisponibilite.epuise) {
-        symbolColor = Colors.red;
+      // Sauvegarder la recherche si elle n'est pas vide
+      if (_searchController.text.trim().isNotEmpty) {
+        await _historyService.addRecentSearch(_searchController.text.trim());
       }
 
-      _mapController?.addSymbol(
-        SymbolOptions(
-          geometry: LatLng(commercant.localisation.latitude, commercant.localisation.longitude),
-          iconColor: symbolColor.toHexStringRGB(),
-          iconImage: "circle-15",
-          iconSize: 1.5,
-          textField: commercant.nom,
-          textOffset: const Offset(0, 1.5),
-        ),
-        // {'commercantId': commercant.id}
-      );
+      if (mounted) {
+        setState(() {
+          _commercants = commercants;
+          _filteredCommercants = commercants;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print("Erreur lors de l'application des filtres: $e");
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Widget _buildFilterChips() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4.0),
-              child: FilterChip(
-                label: Text(_selectedDisponibilite == StatutDisponibilite.disponible
-                            ? "Disponible ✅"
-                            : _selectedDisponibilite == StatutDisponibilite.epuise
-                              ? "Épuisé ❌"
-                              : "Disponibilité"),
-                selected: _selectedDisponibilite != null,
-                onSelected: (bool selected) {
-                  setState(() {
-                    if (_selectedDisponibilite == null) {
-                      _selectedDisponibilite = StatutDisponibilite.disponible;
-                    } else if (_selectedDisponibilite == StatutDisponibilite.disponible) {
-                      _selectedDisponibilite = StatutDisponibilite.epuise;
-                    } else {
-                      _selectedDisponibilite = null;
-                    }
-                    _applyFiltersAndSearch();
-                  });
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4.0),
-              child: FilterChip(
-                label: Text(_selectedOuverture == true
-                            ? "Ouvert 🕒"
-                            : _selectedOuverture == false
-                              ? "Fermé 🔒"
-                              : "Statut"),
-                selected: _selectedOuverture != null,
-                onSelected: (bool selected) {
-                   setState(() {
-                    if (_selectedOuverture == null) {
-                      _selectedOuverture = true;
-                    } else if (_selectedOuverture == true) {
-                      _selectedOuverture = false;
-                    } else {
-                      _selectedOuverture = null;
-                    }
-                    _applyFiltersAndSearch();
-                  });
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4.0),
-              child: ActionChip(
-                label: const Text("Distance 📍"),
-                onPressed: () {
-                  if(mounted){
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Filtre de distance à implémenter.')),
-                    );
-                  }
-                },
-              ),
-            ),
-          ],
-        ),
+  Widget _buildMap() {
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: _initialCameraPosition,
+        initialZoom: 11.0,
       ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.app',
+        ),
+        MarkerLayer(markers: _buildMarkers()),
+      ],
     );
+  }
+
+  List<Marker> _buildMarkers() {
+    return _filteredCommercants.map((commercant) {
+      return Marker(
+        point: LatLng(commercant.localisation.latitude,
+            commercant.localisation.longitude),
+        width: 40,
+        height: 40,
+        child: GestureDetector(
+          onTap: () {/* Afficher les détails */},
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.primaryColor,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: Icon(_getIconForCommercantType(commercant.typeCommercant),
+                color: Colors.white, size: 20),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  IconData _getIconForCommercantType(TypeCommercant type) {
+    switch (type) {
+      case TypeCommercant.boutique:
+        return Icons.store;
+      case TypeCommercant.kiosque:
+        return Icons.widgets;
+      case TypeCommercant.stationService:
+        return Icons.local_gas_station;
+      case TypeCommercant.pharmacie:
+        return Icons.local_pharmacy;
+      case TypeCommercant.supermarche:
+        return Icons.shopping_cart;
+      default:
+        return Icons.location_pin;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // final localizations = AppLocalizations.of(context)!;
-
-    if (AppConfig.mapboxAccessToken == 'YOUR_MAPBOX_ACCESS_TOKEN_HERE' || AppConfig.mapboxAccessToken.isEmpty) {
-       return const Scaffold(
-        body: Center(
-          child: Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              "Erreur: Clé d'accès Mapbox non configurée.\n"
-              "Veuillez configurer `mapboxAccessToken` dans `lib/core/config/app_config.dart`.",
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("LocaCharge"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.my_location),
-            onPressed: _getCurrentLocationAndCenterMap,
-            tooltip: "Centrer sur ma position",
-          ),
-          // IconButton pour la vue liste supprimé d'ici
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(kToolbarHeight + 50),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: "Rechercher une boutique, un quartier...",
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.0),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                  ),
+      backgroundColor: AppColors.backgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header moderne avec gradient
+            Container(
+              decoration: const BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(24),
+                  bottomRight: Radius.circular(24),
                 ),
-                _buildFilterChips(),
-              ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'LocaCharge',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'Trouvez des points de recharge près de chez vous',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                        ModernIconButton(
+                          icon: Icons.person,
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          iconColor: Colors.white,
+                          onPressed: () => context.go('/account'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    ModernSearchField(
+                      hint: 'Rechercher un commerçant...',
+                      controller: _searchController,
+                      onChanged: _searchCommercants,
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
+
+            // Filtres modernes
+            Container(
+              height: 60,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _filtersList.length,
+                itemBuilder: (context, index) {
+                  final filter = _filtersList[index];
+                  final isSelected = _selectedFilter == filter;
+
+                  return Container(
+                    margin: const EdgeInsets.only(right: 12),
+                    child: GestureDetector(
+                      onTap: () => _filterCommercants(filter),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          gradient:
+                              isSelected ? AppColors.primaryGradient : null,
+                          color: isSelected ? null : AppColors.surfaceColor,
+                          borderRadius: BorderRadius.circular(25),
+                          border: Border.all(
+                            color: isSelected
+                                ? Colors.transparent
+                                : AppColors.grey200,
+                            width: 1.5,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color:
+                                        AppColors.primaryColor.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ]
+                              : [
+                                  BoxShadow(
+                                    color: AppColors.grey200.withOpacity(0.3),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                        ),
+                        child: Text(
+                          filter,
+                          style: TextStyle(
+                            color: isSelected
+                                ? Colors.white
+                                : AppColors.textSecondary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // Contenu principal
+            Expanded(
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primaryColor),
+                      ),
+                    )
+                  : _filteredCommercants.isEmpty
+                      ? _buildEmptyState()
+                      : _buildCommercantsList(),
+            ),
+          ],
         ),
       ),
-      body: MapboxMap(
-        accessToken: AppConfig.mapboxAccessToken,
-        onMapCreated: _onMapCreated,
-        onStyleLoadedCallback: _onStyleLoadedCallback,
-        initialCameraPosition: CameraPosition(
-          target: _initialCameraPosition,
-          zoom: 11.0,
-        ),
-        myLocationEnabled: _myLocationEnabled,
-        myLocationTrackingMode: _myLocationEnabled ? MyLocationTrackingMode.Tracking : MyLocationTrackingMode.None,
-        // styleString: MapboxStyles.MAPBOX_STREETS,
+      floatingActionButton: ModernFloatingActionButton(
+        icon: Icons.my_location,
+        onPressed: () {
+          // Action pour localiser l'utilisateur
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.grey100,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.search_off,
+              size: 64,
+              color: AppColors.textLight,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Aucun commerçant trouvé',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Essayez de modifier vos critères de recherche',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommercantsList() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: _filteredCommercants.length,
+      itemBuilder: (context, index) {
+        final commercant = _filteredCommercants[index];
+        final isOpen = commercant.estOuvertMaintenant;
+
+        return ModernCard(
+          onTap: () {
+            context.go('/commercant/${commercant.id}');
+          },
+          child: Row(
+            children: [
+              // Avatar du commerçant
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  gradient: AppColors.secondaryGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.store,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+
+              // Informations du commerçant
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      commercant.nom,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          size: 14,
+                          color: AppColors.textLight,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            commercant.localisation.adresse ??
+                                'Adresse non disponible',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: commercant.services.take(3).map((service) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            service,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Statut et distance
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isOpen
+                          ? AppColors.successColor.withOpacity(0.1)
+                          : AppColors.errorColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      isOpen ? 'Ouvert' : 'Fermé',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isOpen
+                            ? AppColors.successColor
+                            : AppColors.errorColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${(index + 1) * 0.5} km',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textLight,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _loadCommercants() async {
+    try {
+      final commercants = await _commercantService.getAllCommercants();
+      setState(() {
+        _commercants = commercants;
+        _filteredCommercants = commercants;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      _showErrorSnackBar('Erreur lors du chargement des commerçants');
+    }
+  }
+
+  Future<void> _loadRecentSearches() async {
+    // Méthode non nécessaire pour le moment
+  }
+
+  void _filterCommercants(String filter) {
+    setState(() {
+      _selectedFilter = filter;
+      if (filter == 'Tous') {
+        _filteredCommercants = _commercants;
+      } else if (filter == 'Recharge') {
+        _filteredCommercants =
+            _commercants.where((c) => c.services.contains('Recharge')).toList();
+      } else if (filter == 'Services') {
+        _filteredCommercants =
+            _commercants.where((c) => c.services.contains('Services')).toList();
+      } else if (filter == 'Proximité') {
+        // Tri par distance (simulation)
+        _filteredCommercants = List.from(_commercants)
+          ..sort((a, b) => a.nom.compareTo(b.nom));
+      }
+    });
+  }
+
+  void _searchCommercants(String query) {
+    if (query.isEmpty) {
+      _filterCommercants(_selectedFilter);
+    } else {
+      setState(() {
+        _filteredCommercants = _commercants
+            .where((commercant) =>
+                commercant.nom.toLowerCase().contains(query.toLowerCase()) ||
+                (commercant.localisation.adresse?.toLowerCase() ?? '')
+                    .contains(query.toLowerCase()) ||
+                commercant.services.any((service) =>
+                    service.toLowerCase().contains(query.toLowerCase())))
+            .toList();
+      });
+
+      // Sauvegarder la recherche
+      if (query.isNotEmpty) {
+        _historyService.addRecentSearch(query);
+      }
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.errorColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }

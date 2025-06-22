@@ -1,80 +1,78 @@
 // lib/features/home/widgets/commercant_list_item.dart
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:locacharge/core/models/commercant_model.dart';
-// Importer CommercantDetailScreen pour la navigation
-import 'package:locacharge/features/home/screens/fiche_commercant_screen.dart'; // Temporairement fiche_commercant_screen
+import 'package:locacharge/shared/styles/colors.dart';
 
 class CommercantListItem extends StatelessWidget {
   final CommercantModel commercant;
 
-  const CommercantListItem({super.key, required this.commercant});
+  const CommercantListItem({
+    super.key,
+    required this.commercant,
+  });
 
   @override
   Widget build(BuildContext context) {
-    Color statutColor = Colors.grey;
-    IconData statutIcon = Icons.help_outline;
-
-    if (commercant.statutDisponibilite == StatutDisponibilite.disponible) {
-      statutColor = Colors.green;
-      statutIcon = Icons.check_circle_outline;
-    } else if (commercant.statutDisponibilite == StatutDisponibilite.epuise) {
-      statutColor = Colors.red;
-      statutIcon = Icons.highlight_off_outlined;
-    }
-
-    // Simplification des horaires pour l'affichage liste
-    String horaireSimplifie = "Horaires non disponibles";
-    if (commercant.horaires.isNotEmpty) {
-      final premierHoraire = commercant.horaires.first;
-      if (premierHoraire.estOuvert24h) {
-        horaireSimplifie = "Ouvert 24h/24";
-      } else {
-        horaireSimplifie = "${premierHoraire.ouverture} - ${premierHoraire.fermeture}";
-      }
-    }
-    if (!commercant.estOuvertMaintenant) {
-        horaireSimplifie = "Fermé actuellement";
-    }
-
-
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: statutColor,
-          child: commercant.imageUrl != null && commercant.imageUrl!.isNotEmpty
-              ? ClipOval(child: Image.network(commercant.imageUrl!, fit: BoxFit.cover, width: 50, height: 50, errorBuilder: (c, o, s) => Icon(statutIcon, color: Colors.white)))
-              : Icon(statutIcon, color: Colors.white),
+          backgroundColor: AppColors.primaryColor,
+          child: Text(
+            commercant.nom[0].toUpperCase(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
-        title: Text(commercant.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(
+          commercant.nom,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(commercant.localisation.adresse ?? 'Adresse non spécifiée'),
-            Text("Tél: ${commercant.telephone ?? 'N/A'}"),
-            Text("Horaire: $horaireSimplifie"),
-            Row(
-              children: [
-                Icon(Icons.circle, color: statutColor, size: 12),
-                const SizedBox(width: 4),
-                Text(
-                  commercant.statutDisponibilite == StatutDisponibilite.disponible ? 'Disponible' :
-                  commercant.statutDisponibilite == StatutDisponibilite.epuise ? 'Épuisé' : 'Inconnu',
-                  style: TextStyle(color: statutColor),
-                ),
-              ],
-            )
+            Text(
+              commercant.localisation.adresse ?? 'Adresse non disponible',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 4,
+              children: commercant.services.take(3).map((service) {
+                return Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    service,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.primaryColor,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           ],
         ),
-        isThreeLine: true, // Permet plus d'espace pour le sous-titre
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          color: AppColors.textLight,
+          size: 16,
+        ),
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              // Utiliser fiche_commercant_screen.dart comme CommercantDetailScreen
-              builder: (context) => CommercantDetailScreen(commercant: commercant),
-            ),
-          );
+          context.go('/commercant/${commercant.id}');
         },
       ),
     );
