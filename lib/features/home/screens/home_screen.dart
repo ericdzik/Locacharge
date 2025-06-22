@@ -12,6 +12,7 @@ import 'package:locacharge/core/models/horaire_model.dart'; // Import HoraireMod
 import 'package:locacharge/features/home/screens/list_view_screen.dart'; // Import ListViewScreen
 import 'package:locacharge/features/home/screens/fiche_commercant_screen.dart'; // Import pour la navigation
 import 'package:locacharge/core/localization/manual_translations.dart'; // Importer ManualTranslations
+import 'package:locacharge/core/services/commercant_service.dart'; // Importer CommercantService
 // Pour l'internationalisation (exemple)
 // import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
@@ -45,6 +46,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _debounce;
 
   final ManualTranslations _translations = ManualTranslations(const Locale('fr')); // Instance de traductions
+  final CommercantService _commercantService = CommercantService(); // Instance de CommercantService
+  StreamSubscription? _commercantsSubscription; // Pour la souscription au Stream
+  bool _isLoadingCommercants = true; // État de chargement initial
+  String? _loadingError; // Pour stocker les messages d'erreur
 
   // États des filtres
   StatutDisponibilite? _selectedDisponibilite;
@@ -53,9 +58,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // _mapController = MapController(); // Initialisation ici si non fait à la déclaration
     _requestLocationPermission();
-    _fetchMockCommercants();
+    // _fetchMockCommercants(); // Supprimé
+    _subscribeToCommercantsStream(); // Démarrer l'écoute du stream
     _searchController.addListener(_onSearchChanged);
 
     // Appeler les actions initiales après le premier frame
@@ -74,51 +79,45 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _debounce?.cancel();
+    _commercantsSubscription?.cancel(); // Annuler la souscription
     // _mapController.dispose(); // MapController n'a pas de méthode dispose publique typique comme les contrôleurs de texte.
     super.dispose();
   }
 
-  void _fetchMockCommercants() {
-    Future.delayed(const Duration(seconds: 1), () {
-      if (!mounted) return;
-      setState(() {
-        _allCommercants = [
-          CommercantModel(
-            id: '1',
-            nom: 'Boutique Chez Ali',
-            localisation: LocalisationModel(latitude: 5.3550, longitude: -4.0200, adresse: "Treichville Centre"),
-            horaires: [HoraireModel(jour: "Lundi", ouverture: "08:00", fermeture: "19:00")], // Exemple
-            statutDisponibilite: StatutDisponibilite.disponible,
-            telephone: "0102030405"
-          ),
-          CommercantModel(
-            id: '2',
-            nom: 'Station Service Shell Cocody',
-            localisation: LocalisationModel(latitude: 5.3600, longitude: -3.9900, adresse: "Cocody Danga"),
-            horaires: [HoraireModel(jour: "Mardi", ouverture: "00:00", fermeture: "23:59", estOuvert24h: true)], // Ouvert 24h
-            statutDisponibilite: StatutDisponibilite.epuise,
-            telephone: "0506070809"
-          ),
-          CommercantModel(
-            id: '3',
-            nom: 'Le Kiosque Orange Money Marcory',
-            localisation: LocalisationModel(latitude: 5.3480, longitude: -4.0280, adresse: "Marcory Remblais"),
-            horaires: [HoraireModel(jour: "Mercredi", ouverture: "10:00", fermeture: "17:00")], // Supposons fermé actuellement pour test
-            statutDisponibilite: StatutDisponibilite.disponible,
-            telephone: "0708090001"
-          ),
-           CommercantModel(
-            id: '4',
-            nom: 'Pharmacie de la Savane',
-            localisation: LocalisationModel(latitude: 5.3510, longitude: -4.0150, adresse: "Treichville Savane"),
-            horaires: [HoraireModel(jour: "Jeudi", ouverture: "08:00", fermeture: "22:00")],
-            statutDisponibilite: StatutDisponibilite.disponible,
-            telephone: "0700000001"
-          ),
-        ];
-        _applyFiltersAndSearch();
-      });
+  // void _fetchMockCommercants() { // Supprimé
+  // }
+
+  void _subscribeToCommercantsStream() {
+    setState(() { // Indiquer le début du chargement
+      _isLoadingCommercants = true;
+      _loadingError = null;
     });
+    _commercantsSubscription = _commercantService.getAllCommercantsStream().listen(
+      (commercants) {
+        if (!mounted) return;
+        setState(() {
+          _allCommercants = commercants;
+          _isLoadingCommercants = false;
+          _applyFiltersAndSearch(); // Mettre à jour les filtres et les marqueurs
+        });
+      },
+      onError: (error) {
+        if (!mounted) return;
+        print("Erreur de chargement des commerçants: $error");
+        setState(() {
+          _isLoadingCommercants = false;
+          _loadingError = "Erreur de chargement des points de recharge.";
+          _allCommercants = []; // Vider la liste en cas d'erreur
+          _applyFiltersAndSearch();
+        });
+      },
+      onDone: () { // Optionnel: gérer la fin du stream si ce n'est pas un stream infini
+        if (!mounted) return;
+        setState(() {
+          _isLoadingCommercants = false;
+        });
+      }
+    );
   }
 
   Future<void> _requestLocationPermission() async {
@@ -324,20 +323,21 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     // final localizations = AppLocalizations.of(context)!; // Supprimé pour l'instant
 
-    if (AppConfig.mapboxAccessToken == 'YOUR_MAPBOX_ACCESS_TOKEN_HERE' || AppConfig.mapboxAccessToken.isEmpty) {
-       return const Scaffold(
-        body: Center(
-          child: Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              "Erreur: Clé d'accès Mapbox non configurée.\n"
-              "Veuillez configurer `mapboxAccessToken` dans `lib/core/config/app_config.dart`.",
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
-    }
+    // La vérification de la clé Mapbox n'est plus pertinente ici si on utilise OSM et pas de services Mapbox payants.
+    // if (AppConfig.mapboxAccessToken == 'YOUR_MAPBOX_ACCESS_TOKEN_HERE' || AppConfig.mapboxAccessToken.isEmpty) {
+    //    return const Scaffold(
+    //     body: Center(
+    //       child: Padding(
+    //         padding: EdgeInsets.all(16.0),
+    //         child: Text(
+    //           "Erreur: Clé d'accès Mapbox non configurée.\n"
+    //           "Veuillez configurer `mapboxAccessToken` dans `lib/core/config/app_config.dart`.",
+    //           textAlign: TextAlign.center,
+    //         ),
+    //       ),
+    //     ),
+    //   );
+    // }
 
     return Scaffold(
       appBar: AppBar(
@@ -376,33 +376,38 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      body: FlutterMap(
-        mapController: _mapController,
-        options: MapOptions(
-          initialCenter: _initialCameraPosition, // Type latlong.LatLng
-          initialZoom: 11.0,
-          // onMapEvent: _onMapEvent, // Si besoin de gérer les événements de la carte
-          // onTap: _onTap, // Si besoin de gérer les clics sur la carte
-        ),
-        children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.example.locacharge',
-          ),
-          MarkerLayer(
-            markers: [
-              if (_myLocationEnabled && _currentPositionMarker != null)
-                Marker(
-                  point: _currentPositionMarker!,
-                  width: 80.0,
-                  height: 80.0,
-                  child: Icon(Icons.my_location, color: Colors.blue.shade700, size: 30.0),
+      body: _isLoadingCommercants
+          ? const Center(child: CircularProgressIndicator())
+          : _loadingError != null
+              ? Center(child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(_loadingError!, style: const TextStyle(color: Colors.red, fontSize: 16), textAlign: TextAlign.center),
+                ))
+              : FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: _initialCameraPosition,
+                    initialZoom: 11.0,
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.locacharge',
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        if (_myLocationEnabled && _currentPositionMarker != null)
+                          Marker(
+                            point: _currentPositionMarker!,
+                            width: 80.0,
+                            height: 80.0,
+                            child: Icon(Icons.my_location, color: Colors.blue.shade700, size: 30.0),
+                          ),
+                        ..._buildCommercantMarkersList(_filteredCommercants),
+                      ],
+                    ),
+                  ],
                 ),
-              ..._buildCommercantMarkersList(_filteredCommercants), // Ajoute les marqueurs des commerçants
-            ],
-          ),
-        ],
-      ),
     );
   }
 }
