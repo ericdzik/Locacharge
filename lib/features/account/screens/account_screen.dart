@@ -239,8 +239,8 @@ class _DevenirCommercantFormState extends State<_DevenirCommercantForm> {
         'role': 'UserRole.commercant',
       });
       if (mounted) {
-        Navigator.of(context).pop();
-        Navigator.of(context).pushReplacementNamed('/commercant/dashboard');
+        Navigator.of(context).pop(); // Ferme le BottomSheet
+        context.go('/commercant/dashboard'); // Utilise GoRouter pour la navigation
       }
     } catch (e) {
       if (mounted) {
