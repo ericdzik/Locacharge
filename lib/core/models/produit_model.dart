@@ -1,4 +1,6 @@
 // lib/core/models/produit_model.dart
+import 'package:cloud_firestore/cloud_firestore.dart'; // Ajout de l'import
+
 enum TypeProduit {
   rechargeTelephonique,
   forfaitInternet,

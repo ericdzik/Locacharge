@@ -1,4 +1,5 @@
 // lib/core/models/commercant_model.dart
+import 'package:cloud_firestore/cloud_firestore.dart'; // Ajout de l'import
 import 'package:locacharge/core/models/horaire_model.dart';
 import 'package:locacharge/core/models/localisation_model.dart';
 import 'package:locacharge/core/models/produit_model.dart';
