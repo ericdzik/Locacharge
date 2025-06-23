@@ -252,50 +252,16 @@ class CommercantService {
   // avec les autres changements (par exemple, utilisation de commercant.id pour doc().set())
   Future<bool> createCommercant(CommercantModel commercant) async {
     try {
-      // Si l'ID du commerçant est déjà défini et doit être utilisé comme ID de document:
-      // await _firestore.collection(_collectionPath).doc(commercant.id).set(commercant.toMap());
-      // Si l'ID doit être auto-généré par Firestore:
+      // Utilisation de toMapWithoutId() si l'ID doit être auto-généré par Firestore.
+      // Si l'ID du CommercantModel est déjà l'ID souhaité pour le document,
+      // on utiliserait .doc(commercant.id).set(commercant.toMap()).
+      // La méthode createOrUpdateCommercant gère déjà le cas .doc(commercant.id).set().
+      // Cette méthode createCommercant est donc plus orientée vers la création avec ID auto-généré.
       DocumentReference docRef = await _firestore.collection(_collectionPath).add(commercant.toMapWithoutId());
-      // Optionnel: mettre à jour le modèle avec l'ID généré si besoin immédiat.
-      // commercant = commercant.copyWith(id: docRef.id);
+      // Pourrait être utile de retourner l'ID: return docRef.id; (changerait la signature de la méthode)
       return true;
     } catch (e) {
-      print('Erreur lors de la création du commerçant: $e');
-      return false;
-    }
-  }
-
-  Future<bool> updateCommercantFirebase(CommercantModel commercant) async {
-    try {
-      await _firestore
-          .collection(_collectionPath)
-          .doc(commercant.id)
-          .update(commercant.toMap()); // toMap() devrait exclure l'ID si l'ID est l'ID du document
-                                     // ou être idempotent si l'ID est inclus.
-                                     // CommercantModel.toMap() n'inclut pas l'ID, c'est bien.
-      return true;
-    } catch (e) {
-      print('Erreur lors de la mise à jour du commerçant: $e');
-      return false;
-    }
-  }
-
-  Future<bool> deleteCommercantFirebase(String id) async {
-    try {
-      await _firestore.collection(_collectionPath).doc(id).delete();
-      return true;
-    } catch (e) {
-      print('Erreur lors de la suppression du commerçant: $e');
-      return false;
-    }
-  }
-
-  Future<bool> createCommercant(CommercantModel commercant) async {
-    try {
-      await _firestore.collection(_collectionPath).add(commercant.toMap());
-      return true;
-    } catch (e) {
-      print('Erreur lors de la création du commerçant: $e');
+      print('Erreur CommercantService - createCommercant: $e');
       return false;
     }
   }
@@ -308,7 +274,7 @@ class CommercantService {
           .update(commercant.toMap());
       return true;
     } catch (e) {
-      print('Erreur lors de la mise à jour du commerçant: $e');
+      print('Erreur CommercantService - updateCommercantFirebase: $e');
       return false;
     }
   }
@@ -318,7 +284,7 @@ class CommercantService {
       await _firestore.collection(_collectionPath).doc(id).delete();
       return true;
     } catch (e) {
-      print('Erreur lors de la suppression du commerçant: $e');
+      print('Erreur CommercantService - deleteCommercantFirebase: $e');
       return false;
     }
   }
