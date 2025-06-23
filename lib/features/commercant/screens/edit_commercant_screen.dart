@@ -90,7 +90,10 @@ class _EditCommercantScreenState extends State<EditCommercantScreen> {
         dateModification: DateTime.now(),
       );
 
-      await _commercantService.updateCommercant(updatedCommercant);
+      // Remplacer par la méthode Firebase appropriée, par exemple updateCommercantFirebase
+      // ou createOrUpdateCommercant si l'ID est déjà celui du document Firestore.
+      // Étant donné que c'est un écran "Edit", on s'attend à ce que l'ID soit celui du document.
+      await _commercantService.updateCommercantFirebase(updatedCommercant);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

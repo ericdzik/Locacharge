@@ -1,5 +1,6 @@
 // lib/features/home/screens/home_screen.dart
 import 'dart:async';
+import 'dart:math'; // Ajout de l'import pour pi, sin, cos, etc.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Pour SystemChannels
 import 'package:geolocator/geolocator.dart';
@@ -31,6 +32,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   MapController? _mapController;
   LatLng _initialCameraPosition = const LatLng(5.3454, -4.0245); // Abidjan
+  LatLng? _userLocation; // Déclaration de _userLocation
   bool _myLocationEnabled = false;
 
   final CommercantService _commercantService = CommercantService();
