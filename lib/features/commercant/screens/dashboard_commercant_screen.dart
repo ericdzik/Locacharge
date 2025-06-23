@@ -65,16 +65,20 @@ class _DashboardCommercantScreenState extends State<DashboardCommercantScreen> {
     _currentUserData = await _userService.getUserById(firebaseUser.uid);
     // Supposons que l'ID utilisateur est l'ID du document commerçant
     if (_currentUserData?.role == UserRole.commercant) {
-      _commercantData =
-          await _commercantService.getCommercantByUserId(firebaseUser.uid);
+      _commercantData = await _commercantService.getCommercantByUserId(firebaseUser.uid);
+
+      // Si non trouvé immédiatement, attendre un peu et réessayer (pour délai de propagation Firestore)
+      if (_commercantData == null) {
+        await Future.delayed(const Duration(seconds: 2));
+        _commercantData = await _commercantService.getCommercantByUserId(firebaseUser.uid);
+      }
+
       // Charger les vraies statistiques de visites
       if (_commercantData != null) {
-        _visitsCount = await _analyticsService
-            .getCommercantViews(_commercantData!.id, days: 30);
+        _visitsCount = await _analyticsService.getCommercantViews(_commercantData!.id, days: 30);
       }
     } else {
-      _commercantData =
-          null; // S'assurer qu'il est null si ce n'est pas un commerçant
+      _commercantData = null; // S'assurer qu'il est null si ce n'est pas un commerçant
     }
 
     if (!mounted) return;
