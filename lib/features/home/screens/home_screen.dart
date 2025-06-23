@@ -112,37 +112,93 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
 
+    String? query = _searchController.text.trim().isEmpty ? null : _searchController.text.trim();
+    List<TypeProduit>? filterTypesProduit;
+    List<String>? filterServices;
+    bool? filterEstOuvert;
+
+    // Appliquer les filtres rapides basés sur _selectedFilter
+    switch (_selectedFilter) {
+      case 'Recharge':
+        filterTypesProduit = [TypeProduit.rechargeTelephonique];
+        break;
+      case 'Services': // Exemple: pourrait être Mobile Money ou autres services spécifiques
+        // Pour l'instant, interprétons "Services" comme "Mobile Money" pour la démo
+        filterTypesProduit = [TypeProduit.mobileMoney];
+        // Ou si vous avez un champ 'services' textuel:
+        // filterServices = ['Mobile Money']; // exemple
+        break;
+      // Le filtre 'Proximité' sera géré par le tri après la récupération
+      // Le filtre 'Tous' n'ajoute pas de filtres spécifiques ici
+    }
+
+    // Appliquer les filtres avancés (ceux de la map _filters)
+    // Ces filtres s'ajoutent ou surchargent ceux des filtres rapides si définis
+    List<TypeProduit> advancedTypesProduit = [];
+    if (_filters['recharge']!) advancedTypesProduit.add(TypeProduit.rechargeTelephonique);
+    if (_filters['transfert']!) advancedTypesProduit.add(TypeProduit.mobileMoney);
+    // Combiner avec filterTypesProduit si nécessaire, ou laisser l'UI des filtres avancés être la source principale
+    if (advancedTypesProduit.isNotEmpty) {
+      filterTypesProduit = filterTypesProduit == null ? [] : List.from(filterTypesProduit);
+      filterTypesProduit.addAll(advancedTypesProduit);
+      filterTypesProduit = filterTypesProduit.toSet().toList(); // Dédoublonner
+    }
+
+    List<String> advancedServices = [];
+    if (_filters['sim']!) advancedServices.add('vente de sim'); // Exemple de service
+    if (advancedServices.isNotEmpty) {
+       filterServices = filterServices == null ? [] : List.from(filterServices);
+       filterServices.addAll(advancedServices);
+       filterServices = filterServices.toSet().toList();
+    }
+
+    if (_filters['ouvert']!) {
+      filterEstOuvert = true;
+    }
+
     try {
-      List<TypeProduit> typesProduit = [];
-      if (_filters['recharge']!)
-        typesProduit.add(TypeProduit.rechargeTelephonique);
-      if (_filters['transfert']!) typesProduit.add(TypeProduit.mobileMoney);
-
-      List<String> services = [];
-      if (_filters['sim']!) services.add('sim');
-
-      final commercants = await _commercantService.searchCommercants(
-        query: _searchController.text.isEmpty ? null : _searchController.text,
-        estOuvert: _filters['ouvert']! ? true : null,
-        typesProduit: typesProduit,
-        services: services,
+      List<CommercantModel> commercants = await _commercantService.searchCommercants(
+        query: query,
+        estOuvert: filterEstOuvert,
+        typesProduit: filterTypesProduit,
+        services: filterServices,
+        userLocation: _userLocation, // Passer la localisation pour le tri par proximité si besoin
       );
 
-      // Sauvegarder la recherche si elle n'est pas vide
-      if (_searchController.text.trim().isNotEmpty) {
-        await _historyService.addRecentSearch(_searchController.text.trim());
+      // Tri par proximité si ce filtre est sélectionné
+      if (_selectedFilter == 'Proximité' && _userLocation != null) {
+        commercants.sort((a, b) {
+          final distA = _calculateDistanceForCommercant(a);
+          final distB = _calculateDistanceForCommercant(b);
+          if (distA < 0 && distB < 0) return 0; // Les deux distances non calculables
+          if (distA < 0) return 1; // a après b si sa distance n'est pas calculable
+          if (distB < 0) return -1; // b après a si sa distance n'est pas calculable
+          return distA.compareTo(distB);
+        });
       }
 
       if (mounted) {
         setState(() {
-          _commercants = commercants;
+          // Note: _commercants devrait idéalement contenir TOUS les commerçants sans filtres
+          // pour pouvoir réappliquer des filtres différents sans re-fetch.
+          // Ici, on met à jour _commercants et _filteredCommercants avec le résultat.
+          // Cela pourrait être optimisé si _commercants reste la source de vérité complète.
+          // Pour l'instant, on simplifie :
+          _commercants = commercants; // Attention: cela remplace la liste complète
           _filteredCommercants = commercants;
           _isLoading = false;
         });
       }
+
+      // Sauvegarder la recherche si une query textuelle a été utilisée
+      if (query != null && query.isNotEmpty) {
+        await _historyService.addRecentSearch(query);
+      }
+
     } catch (e) {
       print("Erreur lors de l'application des filtres: $e");
       if (mounted) setState(() => _isLoading = false);
+      _showErrorSnackBar("Erreur lors de la recherche: ${e.toString()}");
     }
   }
 
@@ -171,7 +227,9 @@ class _HomeScreenState extends State<HomeScreen> {
         width: 40,
         height: 40,
         child: GestureDetector(
-          onTap: () {/* Afficher les détails */},
+          onTap: () {
+            context.go('/home/commercant/${commercant.id}');
+          },
           child: Container(
             decoration: BoxDecoration(
               color: AppColors.primaryColor,
@@ -332,26 +390,85 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Contenu principal
             Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.primaryColor),
-                      ),
-                    )
-                  : _filteredCommercants.isEmpty
-                      ? _buildEmptyState()
-                      : _buildCommercantsList(),
+              child: Column(
+                children: [
+                  _buildAdvancedFiltersExpansionTile(), // Ajout du panneau de filtres
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.primaryColor),
+                            ),
+                          )
+                        : _filteredCommercants.isEmpty
+                            ? _buildEmptyState()
+                            : _buildCommercantsList(),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
       floatingActionButton: ModernFloatingActionButton(
         icon: Icons.my_location,
-        onPressed: () {
-          // Action pour localiser l'utilisateur
-        },
+        onPressed: _getCurrentLocationAndCenterMap,
       ),
+    );
+  }
+
+  Widget _buildAdvancedFiltersExpansionTile() {
+    return ExpansionTile(
+      title: const Text('Filtres avancés', style: TextStyle(color: AppColors.textPrimary)),
+      leading: const Icon(Icons.filter_list, color: AppColors.primaryColor),
+      childrenPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      children: <Widget>[
+        CheckboxListTile(
+          title: const Text('Recharge disponible'),
+          value: _filters['recharge'],
+          onChanged: (bool? value) {
+            setState(() {
+              _filters['recharge'] = value!;
+            });
+            _applyFiltersAndSearch();
+          },
+          activeColor: AppColors.primaryColor,
+        ),
+        CheckboxListTile(
+          title: const Text('Transfert Mobile Money disponible'),
+          value: _filters['transfert'],
+          onChanged: (bool? value) {
+            setState(() {
+              _filters['transfert'] = value!;
+            });
+            _applyFiltersAndSearch();
+          },
+          activeColor: AppColors.primaryColor,
+        ),
+        CheckboxListTile(
+          title: const Text('Vente de SIM disponible'),
+          value: _filters['sim'],
+          onChanged: (bool? value) {
+            setState(() {
+              _filters['sim'] = value!;
+            });
+            _applyFiltersAndSearch();
+          },
+          activeColor: AppColors.primaryColor,
+        ),
+        CheckboxListTile(
+          title: const Text('Ouvert actuellement'),
+          value: _filters['ouvert'],
+          onChanged: (bool? value) {
+            setState(() {
+              _filters['ouvert'] = value!;
+            });
+            _applyFiltersAndSearch();
+          },
+          activeColor: AppColors.primaryColor,
+        ),
+      ],
     );
   }
 
@@ -383,7 +500,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Essayez de modifier vos critères de recherche',
+            'Essayez de modifier vos critères de recherche ou vos filtres.',
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
@@ -513,7 +630,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${(index + 1) * 0.5} km',
+                    _userLocation != null
+                        ? _formatDistance(_calculateDistanceForCommercant(commercant))
+                        : 'Distance N/A',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textLight,
@@ -530,18 +649,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadCommercants() async {
+    // Modifié pour utiliser CommercantService qui appelle maintenant Firestore
+    setState(() => _isLoading = true);
     try {
       final commercants = await _commercantService.getAllCommercants();
-      setState(() {
-        _commercants = commercants;
-        _filteredCommercants = commercants;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _commercants = commercants;
+          _filteredCommercants = commercants; // Initialiser avec tous les commerçants
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      _showErrorSnackBar('Erreur lors du chargement des commerçants');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      _showErrorSnackBar('Erreur lors du chargement des commerçants: ${e.toString()}');
     }
   }
 
@@ -552,45 +677,22 @@ class _HomeScreenState extends State<HomeScreen> {
   void _filterCommercants(String filter) {
     setState(() {
       _selectedFilter = filter;
-      if (filter == 'Tous') {
-        _filteredCommercants = _commercants;
-      } else if (filter == 'Recharge') {
-        _filteredCommercants =
-            _commercants.where((c) => c.services.contains('Recharge')).toList();
-      } else if (filter == 'Services') {
-        _filteredCommercants =
-            _commercants.where((c) => c.services.contains('Services')).toList();
-      } else if (filter == 'Proximité') {
-        // Tri par distance (simulation)
-        _filteredCommercants = List.from(_commercants)
-          ..sort((a, b) => a.nom.compareTo(b.nom));
-      }
+      // Les paramètres spécifiques pour chaque filtre rapide seront gérés
+      // directement dans _applyFiltersAndSearch en fonction de _selectedFilter.
+      _applyFiltersAndSearch();
     });
   }
 
   void _searchCommercants(String query) {
-    if (query.isEmpty) {
-      _filterCommercants(_selectedFilter);
-    } else {
-      setState(() {
-        _filteredCommercants = _commercants
-            .where((commercant) =>
-                commercant.nom.toLowerCase().contains(query.toLowerCase()) ||
-                (commercant.localisation.adresse?.toLowerCase() ?? '')
-                    .contains(query.toLowerCase()) ||
-                commercant.services.any((service) =>
-                    service.toLowerCase().contains(query.toLowerCase())))
-            .toList();
-      });
-
-      // Sauvegarder la recherche
-      if (query.isNotEmpty) {
-        _historyService.addRecentSearch(query);
-      }
-    }
+    // L'appel direct à _applyFiltersAndSearch est déjà géré par le listener du _searchController
+    // Donc cette méthode pourrait être simplifiée ou supprimée si _onSearchChanged est suffisant.
+    // Pour l'instant, on s'assure que _applyFiltersAndSearch est appelé.
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), _applyFiltersAndSearch);
   }
 
   void _showErrorSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -599,5 +701,35 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
+  }
+  // Méthode pour calculer la distance, pourrait être dans un utilitaire
+  double _calculateDistanceForCommercant(CommercantModel commercant) {
+    if (_userLocation == null) return -1; // Retourne -1 ou lève une exception si pas de loc utilisateur
+
+    const double earthRadius = 6371; // Rayon de la Terre en kilomètres
+
+    final double lat1 = _userLocation!.latitude;
+    final double lon1 = _userLocation!.longitude;
+    final double lat2 = commercant.localisation.latitude;
+    final double lon2 = commercant.localisation.longitude;
+
+    final double dLat = (lat2 - lat1) * (pi / 180);
+    final double dLon = (lon2 - lon1) * (pi / 180);
+
+    final double a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1 * (pi / 180)) *
+            cos(lat2 * (pi / 180)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
+    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadius * c; // Distance en kilomètres
+  }
+
+  String _formatDistance(double distanceKm) {
+    if (distanceKm < 0) return "N/A";
+    if (distanceKm < 1) {
+      return "${(distanceKm * 1000).round()} m";
+    }
+    return "${distanceKm.toStringAsFixed(1)} km";
   }
 }

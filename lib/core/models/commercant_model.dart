@@ -114,6 +114,29 @@ class CommercantModel {
     };
   }
 
+  Map<String, dynamic> toMapWithoutId() {
+    return {
+      'nom': nom,
+      if (description != null) 'description': description,
+      'localisation': localisation.toMap(),
+      'horaires': horaires.map((h) => h.toMap()).toList(),
+      if (imageUrl != null) 'imageUrl': imageUrl,
+      if (telephone != null) 'telephone': telephone,
+      if (email != null) 'email': email,
+      'statutDisponibilite': statutDisponibilite.toString().split('.').last,
+      'estActif': estActif,
+      'typeCommercant': typeCommercant.toString().split('.').last,
+      'produits': produits.map((p) => p.toJson()).toList(),
+      'services': services,
+      if (note != null) 'note': note,
+      'nombreEvaluations': nombreEvaluations,
+      'dateCreation': dateCreation.toIso8601String(),
+      'dateModification': dateModification.toIso8601String(),
+      // 'userId': id, // Supposant que l'ID du commerçant est l'UID de l'utilisateur pour la création via add()
+    };
+  }
+
+
   // Helper pour déterminer si le commerçant est ouvert (basé sur ses horaires)
   bool get estOuvertMaintenant {
     return estActuellementOuvert(

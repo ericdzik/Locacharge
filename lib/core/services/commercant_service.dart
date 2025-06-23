@@ -11,303 +11,27 @@ class CommercantService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collectionPath = 'commercants';
 
-  static final CommercantService _instance = CommercantService._internal();
-  factory CommercantService() => _instance;
-  CommercantService._internal();
+  // static final CommercantService _instance = CommercantService._internal();
+  // factory CommercantService() => _instance;
+  // CommercantService._internal();
+  // Le constructeur par défaut est suffisant si le service est instancié directement.
 
-  // Données mockées pour les produits
-  final List<ProduitModel> _produitsMock = [
-    ProduitModel(
-      id: '1',
-      nom: 'Recharge MTN 1000 FCFA',
-      description: 'Recharge téléphonique MTN de 1000 FCFA',
-      type: TypeProduit.rechargeTelephonique,
-      prix: 1000.0,
-      statut: StatutProduit.disponible,
-      operateurs: ['MTN'],
-      dateCreation: DateTime.now().subtract(const Duration(days: 30)),
-      dateModification: DateTime.now(),
-    ),
-    ProduitModel(
-      id: '2',
-      nom: 'Recharge Orange 500 FCFA',
-      description: 'Recharge téléphonique Orange de 500 FCFA',
-      type: TypeProduit.rechargeTelephonique,
-      prix: 500.0,
-      statut: StatutProduit.disponible,
-      operateurs: ['Orange'],
-      dateCreation: DateTime.now().subtract(const Duration(days: 25)),
-      dateModification: DateTime.now(),
-    ),
-    ProduitModel(
-      id: '3',
-      nom: 'Forfait Internet MTN 1GB',
-      description: 'Forfait Internet MTN 1GB valable 30 jours',
-      type: TypeProduit.forfaitInternet,
-      prix: 2500.0,
-      statut: StatutProduit.disponible,
-      operateurs: ['MTN'],
-      dateCreation: DateTime.now().subtract(const Duration(days: 20)),
-      dateModification: DateTime.now(),
-    ),
-    ProduitModel(
-      id: '4',
-      nom: 'Forfait Internet Orange 2GB',
-      description: 'Forfait Internet Orange 2GB valable 30 jours',
-      type: TypeProduit.forfaitInternet,
-      prix: 3000.0,
-      statut: StatutProduit.epuise,
-      operateurs: ['Orange'],
-      dateCreation: DateTime.now().subtract(const Duration(days: 15)),
-      dateModification: DateTime.now(),
-    ),
-    ProduitModel(
-      id: '5',
-      nom: 'Transfert Mobile Money MTN',
-      description: 'Service de transfert d\'argent via Mobile Money MTN',
-      type: TypeProduit.mobileMoney,
-      prix: 0.0,
-      statut: StatutProduit.disponible,
-      operateurs: ['MTN'],
-      dateCreation: DateTime.now().subtract(const Duration(days: 10)),
-      dateModification: DateTime.now(),
-    ),
-    ProduitModel(
-      id: '6',
-      nom: 'Carte Prépayée Moov 1000 FCFA',
-      description: 'Carte prépayée Moov avec 1000 FCFA de crédit',
-      type: TypeProduit.cartesPrepayees,
-      prix: 1000.0,
-      statut: StatutProduit.disponible,
-      operateurs: ['Moov'],
-      dateCreation: DateTime.now().subtract(const Duration(days: 5)),
-      dateModification: DateTime.now(),
-    ),
-  ];
-
-  // Données mockées pour les commerçants
-  List<CommercantModel> _commercantsMock = [];
-
-  void _initializeMockData() {
-    if (_commercantsMock.isNotEmpty) return;
-
-    _commercantsMock = [
-      CommercantModel(
-        id: '1',
-        nom: 'Boutique Chez Ali',
-        description:
-            'Boutique spécialisée dans les recharges téléphoniques et services numériques',
-        localisation: LocalisationModel(
-            latitude: 5.3550,
-            longitude: -4.0200,
-            adresse: "Treichville Centre, Rue du Commerce"),
-        horaires: [
-          HoraireModel(jour: "Lundi", ouverture: "08:00", fermeture: "19:00"),
-          HoraireModel(jour: "Mardi", ouverture: "08:00", fermeture: "19:00"),
-          HoraireModel(
-              jour: "Mercredi", ouverture: "08:00", fermeture: "19:00"),
-          HoraireModel(jour: "Jeudi", ouverture: "08:00", fermeture: "19:00"),
-          HoraireModel(
-              jour: "Vendredi", ouverture: "08:00", fermeture: "19:00"),
-          HoraireModel(jour: "Samedi", ouverture: "09:00", fermeture: "17:00"),
-        ],
-        statutDisponibilite: StatutDisponibilite.disponible,
-        telephone: "0102030405",
-        email: "ali@boutique.com",
-        typeCommercant: TypeCommercant.boutique,
-        produits: _produitsMock
-            .take(3)
-            .toList(), // MTN recharge, Orange recharge, MTN internet
-        services: [
-          'Mobile Money MTN',
-          'Mobile Money Orange',
-          'Transfert d\'argent'
-        ],
-        note: 4.5,
-        nombreEvaluations: 127,
-        dateCreation: DateTime.now().subtract(const Duration(days: 365)),
-        dateModification: DateTime.now(),
-      ),
-      CommercantModel(
-        id: '2',
-        nom: 'Station Service Shell Cocody',
-        description: 'Station service avec kiosque de services numériques',
-        localisation: LocalisationModel(
-            latitude: 5.3600,
-            longitude: -3.9900,
-            adresse: "Cocody Danga, Boulevard Latrille"),
-        horaires: [
-          HoraireModel(
-              jour: "Lundi",
-              ouverture: "00:00",
-              fermeture: "23:59",
-              estOuvert24h: true),
-          HoraireModel(
-              jour: "Mardi",
-              ouverture: "00:00",
-              fermeture: "23:59",
-              estOuvert24h: true),
-          HoraireModel(
-              jour: "Mercredi",
-              ouverture: "00:00",
-              fermeture: "23:59",
-              estOuvert24h: true),
-          HoraireModel(
-              jour: "Jeudi",
-              ouverture: "00:00",
-              fermeture: "23:59",
-              estOuvert24h: true),
-          HoraireModel(
-              jour: "Vendredi",
-              ouverture: "00:00",
-              fermeture: "23:59",
-              estOuvert24h: true),
-          HoraireModel(
-              jour: "Samedi",
-              ouverture: "00:00",
-              fermeture: "23:59",
-              estOuvert24h: true),
-          HoraireModel(
-              jour: "Dimanche",
-              ouverture: "00:00",
-              fermeture: "23:59",
-              estOuvert24h: true),
-        ],
-        statutDisponibilite: StatutDisponibilite.epuise,
-        telephone: "0506070809",
-        email: "contact@shell-cocody.com",
-        typeCommercant: TypeCommercant.stationService,
-        produits:
-            _produitsMock.take(2).toList(), // MTN recharge, Orange recharge
-        services: ['Mobile Money MTN', 'Mobile Money Orange'],
-        note: 4.2,
-        nombreEvaluations: 89,
-        dateCreation: DateTime.now().subtract(const Duration(days: 300)),
-        dateModification: DateTime.now(),
-      ),
-      CommercantModel(
-        id: '3',
-        nom: 'Le Kiosque Orange Money Marcory',
-        description: 'Kiosque officiel Orange Money pour tous services Orange',
-        localisation: LocalisationModel(
-            latitude: 5.3480,
-            longitude: -4.0280,
-            adresse: "Marcory Remblais, Avenue des Banques"),
-        horaires: [
-          HoraireModel(jour: "Lundi", ouverture: "08:00", fermeture: "18:00"),
-          HoraireModel(jour: "Mardi", ouverture: "08:00", fermeture: "18:00"),
-          HoraireModel(
-              jour: "Mercredi", ouverture: "08:00", fermeture: "18:00"),
-          HoraireModel(jour: "Jeudi", ouverture: "08:00", fermeture: "18:00"),
-          HoraireModel(
-              jour: "Vendredi", ouverture: "08:00", fermeture: "18:00"),
-          HoraireModel(jour: "Samedi", ouverture: "09:00", fermeture: "16:00"),
-        ],
-        statutDisponibilite: StatutDisponibilite.disponible,
-        telephone: "0708090001",
-        email: "marcory@orangemoney.ci",
-        typeCommercant: TypeCommercant.kiosque,
-        produits: _produitsMock
-            .where((p) => p.operateurs.contains('Orange'))
-            .toList(),
-        services: [
-          'Mobile Money Orange',
-          'Transfert d\'argent',
-          'Paiement de factures'
-        ],
-        note: 4.8,
-        nombreEvaluations: 234,
-        dateCreation: DateTime.now().subtract(const Duration(days: 200)),
-        dateModification: DateTime.now(),
-      ),
-      CommercantModel(
-        id: '4',
-        nom: 'Pharmacie de la Savane',
-        description: 'Pharmacie avec services de recharges et Mobile Money',
-        localisation: LocalisationModel(
-            latitude: 5.3510,
-            longitude: -4.0150,
-            adresse: "Treichville Savane, Rue des Pharmacies"),
-        horaires: [
-          HoraireModel(jour: "Lundi", ouverture: "08:00", fermeture: "22:00"),
-          HoraireModel(jour: "Mardi", ouverture: "08:00", fermeture: "22:00"),
-          HoraireModel(
-              jour: "Mercredi", ouverture: "08:00", fermeture: "22:00"),
-          HoraireModel(jour: "Jeudi", ouverture: "08:00", fermeture: "22:00"),
-          HoraireModel(
-              jour: "Vendredi", ouverture: "08:00", fermeture: "22:00"),
-          HoraireModel(jour: "Samedi", ouverture: "09:00", fermeture: "20:00"),
-          HoraireModel(
-              jour: "Dimanche", ouverture: "10:00", fermeture: "18:00"),
-        ],
-        statutDisponibilite: StatutDisponibilite.disponible,
-        telephone: "0700000001",
-        email: "contact@pharmacie-savane.ci",
-        typeCommercant: TypeCommercant.pharmacie,
-        produits: _produitsMock.take(4).toList(), // Tous sauf Moov
-        services: [
-          'Mobile Money MTN',
-          'Mobile Money Orange',
-          'Paiement de factures'
-        ],
-        note: 4.6,
-        nombreEvaluations: 156,
-        dateCreation: DateTime.now().subtract(const Duration(days: 150)),
-        dateModification: DateTime.now(),
-      ),
-      CommercantModel(
-        id: '5',
-        nom: 'Super Marché Cocody Centre',
-        description: 'Supermarché avec section services numériques',
-        localisation: LocalisationModel(
-            latitude: 5.3650,
-            longitude: -3.9850,
-            adresse: "Cocody Centre Commercial, 2ème Plateau"),
-        horaires: [
-          HoraireModel(jour: "Lundi", ouverture: "07:00", fermeture: "21:00"),
-          HoraireModel(jour: "Mardi", ouverture: "07:00", fermeture: "21:00"),
-          HoraireModel(
-              jour: "Mercredi", ouverture: "07:00", fermeture: "21:00"),
-          HoraireModel(jour: "Jeudi", ouverture: "07:00", fermeture: "21:00"),
-          HoraireModel(
-              jour: "Vendredi", ouverture: "07:00", fermeture: "21:00"),
-          HoraireModel(jour: "Samedi", ouverture: "08:00", fermeture: "22:00"),
-          HoraireModel(
-              jour: "Dimanche", ouverture: "09:00", fermeture: "20:00"),
-        ],
-        statutDisponibilite: StatutDisponibilite.disponible,
-        telephone: "0800000002",
-        email: "info@supermarche-cocody.ci",
-        typeCommercant: TypeCommercant.supermarche,
-        produits: _produitsMock, // Tous les produits
-        services: [
-          'Mobile Money MTN',
-          'Mobile Money Orange',
-          'Mobile Money Moov',
-          'Transfert d\'argent',
-          'Paiement de factures'
-        ],
-        note: 4.3,
-        nombreEvaluations: 445,
-        dateCreation: DateTime.now().subtract(const Duration(days: 100)),
-        dateModification: DateTime.now(),
-      ),
-    ];
-  }
+  // Les données mockées et _initializeMockData() sont supprimées.
 
   Future<CommercantModel?> getCommercantByUserId(String userId) async {
     try {
-      final doc = await _firestore
+      final querySnapshot = await _firestore
           .collection(_collectionPath)
-          .where('userId', isEqualTo: userId)
+          .where('userId', isEqualTo: userId) // Supposant un champ 'userId' dans le document commerçant
+          .limit(1)
           .get();
-      if (doc.docs.isNotEmpty) {
-        return CommercantModel.fromMap(
-            doc.docs.first.id, doc.docs.first.data());
+      if (querySnapshot.docs.isNotEmpty) {
+        final doc = querySnapshot.docs.first;
+        return CommercantModel.fromMap(doc.id, doc.data() as Map<String, dynamic>);
       }
       return null;
     } catch (e) {
-      print('Erreur lors de la récupération du commerçant: $e');
+      print('Erreur CommercantService - getCommercantByUserId: $e');
       return null;
     }
   }
@@ -316,7 +40,7 @@ class CommercantService {
       String commercantId, StatutDisponibilite statut) async {
     try {
       await _firestore.collection(_collectionPath).doc(commercantId).update({
-        'statutDisponibilite': statut.toString(),
+        'statutDisponibilite': statut.toString().split('.').last, // Sauvegarde la string de l'enum
       });
     } catch (e) {
       print("Erreur CommercantService - updateDisponibilite: $e");
@@ -327,6 +51,10 @@ class CommercantService {
   Future<void> updateCommercantInfo(
       String commercantId, Map<String, dynamic> data) async {
     try {
+      // Assurez-vous que les dates sont converties en Timestamps ou ISO strings si nécessaire
+      // avant d'appeler cette méthode, ou gérez-le ici.
+      // Par exemple, si 'dateModification' est dans data et est un DateTime:
+      // data['dateModification'] = Timestamp.fromDate(data['dateModification']);
       await _firestore
           .collection(_collectionPath)
           .doc(commercantId)
@@ -341,7 +69,7 @@ class CommercantService {
     try {
       await _firestore
           .collection(_collectionPath)
-          .doc(commercant.id)
+          .doc(commercant.id) // Utilise l'ID du commerçant comme ID de document
           .set(commercant.toMap());
     } catch (e) {
       print("Erreur CommercantService - createOrUpdateCommercant: $e");
@@ -358,7 +86,7 @@ class CommercantService {
             .toList();
       } catch (e) {
         print("Erreur CommercantService - getAllCommercantsStream: $e");
-        return []; // Retourne une liste vide en cas d'erreur de parsing
+        return [];
       }
     });
   }
@@ -373,17 +101,26 @@ class CommercantService {
   }
 
   Future<List<CommercantModel>> getAllCommercants() async {
-    _initializeMockData();
-    await Future.delayed(const Duration(milliseconds: 500));
-    return _commercantsMock;
+    try {
+      final snapshot = await _firestore.collection(_collectionPath).get();
+      return snapshot.docs
+          .map((doc) => CommercantModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      print("Erreur CommercantService - getAllCommercants (Firestore): $e");
+      return [];
+    }
   }
 
   Future<CommercantModel?> getCommercantById(String id) async {
-    _initializeMockData();
-    await Future.delayed(const Duration(milliseconds: 200));
     try {
-      return _commercantsMock.firstWhere((c) => c.id == id);
+      final doc = await _firestore.collection(_collectionPath).doc(id).get();
+      if (doc.exists) {
+        return CommercantModel.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+      }
+      return null;
     } catch (e) {
+      print("Erreur CommercantService - getCommercantById (Firestore): $e");
       return null;
     }
   }
@@ -398,68 +135,87 @@ class CommercantService {
     double? distanceMax,
     LatLng? userLocation,
   }) async {
-    _initializeMockData();
-    await Future.delayed(const Duration(milliseconds: 300));
+    try {
+      Query<Map<String, dynamic>> firestoreQuery = _firestore.collection(_collectionPath);
 
-    List<CommercantModel> filtered = _commercantsMock;
+      // TODO: Ajouter des filtres Firestore simples si possible (ex: estActif == true)
+      // Exemple: firestoreQuery = firestoreQuery.where('estActif', isEqualTo: true);
+      // Note: Les requêtes Firestore complexes avec multiples 'array-contains' ou 'OR' sur différents champs
+      // ne sont pas supportées directement. La recherche textuelle partielle non plus.
+      // Pour l'instant, on récupère une base de documents et on filtre en local.
 
-    if (query != null && query.isNotEmpty) {
-      filtered = filtered.where((c) {
-        return c.nom.toLowerCase().contains(query.toLowerCase()) ||
-            (c.description?.toLowerCase().contains(query.toLowerCase()) ??
-                false) ||
-            (c.localisation.adresse
-                    ?.toLowerCase()
-                    .contains(query.toLowerCase()) ??
-                false);
-      }).toList();
-    }
+      // Si une query textuelle est fournie, et si on avait un champ 'keywords' (liste de mots-clés)
+      // dans Firestore, on pourrait tenter un 'array-contains' pour un mot-clé.
+      // if (query != null && query.isNotEmpty) {
+      //   firestoreQuery = firestoreQuery.where('keywords', arrayContains: query.toLowerCase());
+      // }
+      // Pour une recherche textuelle plus robuste, des solutions comme Algolia sont recommandées.
 
-    if (statut != null) {
-      filtered =
-          filtered.where((c) => c.statutDisponibilite == statut).toList();
-    }
-
-    if (estOuvert != null) {
-      filtered =
-          filtered.where((c) => c.estOuvertMaintenant == estOuvert).toList();
-    }
-
-    if (typesProduit != null && typesProduit.isNotEmpty) {
-      filtered = filtered.where((c) {
-        return typesProduit.every(
-            (type) => c.produits.any((p) => p.type == type && p.estDisponible));
-      }).toList();
-    }
-
-    if (services != null && services.isNotEmpty) {
-      filtered = filtered.where((c) {
-        return services.every((service) => c.services
-            .any((s) => s.toLowerCase().contains(service.toLowerCase())));
-      }).toList();
-    }
-
-    if (operateur != null && operateur.isNotEmpty) {
-      filtered = filtered
-          .where((c) => c.produits
-              .any((p) => p.operateurs.contains(operateur) && p.estDisponible))
+      final snapshot = await firestoreQuery.get();
+      List<CommercantModel> allCommercants = snapshot.docs
+          .map((doc) => CommercantModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
           .toList();
-    }
 
-    if (distanceMax != null && userLocation != null) {
-      filtered = filtered.where((c) {
-        final distance = _calculateDistance(
-            userLocation.latitude,
-            userLocation.longitude,
-            c.localisation.latitude,
-            c.localisation.longitude);
-        return distance <= distanceMax;
-      }).toList();
-    }
+      List<CommercantModel> filtered = allCommercants;
 
-    return filtered;
+      if (query != null && query.isNotEmpty) {
+        String lowerQuery = query.toLowerCase();
+        filtered = filtered.where((c) {
+          return c.nom.toLowerCase().contains(lowerQuery) ||
+              (c.description?.toLowerCase().contains(lowerQuery) ?? false) ||
+              (c.localisation.adresse?.toLowerCase().contains(lowerQuery) ?? false) ||
+              c.services.any((s) => s.toLowerCase().contains(lowerQuery)) ||
+              c.produits.any((p) => p.nom.toLowerCase().contains(lowerQuery));
+        }).toList();
+      }
+
+      if (statut != null) {
+        filtered = filtered.where((c) => c.statutDisponibilite == statut).toList();
+      }
+
+      if (estOuvert != null) {
+        // Le calcul de estOuvertMaintenant se fait via le getter du modèle, donc filtrage local.
+        filtered = filtered.where((c) => c.estOuvertMaintenant == estOuvert).toList();
+      }
+
+      if (typesProduit != null && typesProduit.isNotEmpty) {
+        filtered = filtered.where((c) {
+          return typesProduit.every(
+              (type) => c.produits.any((p) => p.type == type && p.estDisponible));
+        }).toList();
+      }
+
+      if (services != null && services.isNotEmpty) {
+        filtered = filtered.where((c) {
+          return services.every((serviceName) =>
+              c.services.any((s) => s.toLowerCase().contains(serviceName.toLowerCase())));
+        }).toList();
+      }
+
+      if (operateur != null && operateur.isNotEmpty) {
+        filtered = filtered.where((c) =>
+            c.produits.any((p) => p.operateurs.contains(operateur) && p.estDisponible)
+        ).toList();
+      }
+
+      if (distanceMax != null && userLocation != null) {
+        filtered = filtered.where((c) {
+          final distance = _calculateDistance(
+              userLocation.latitude,
+              userLocation.longitude,
+              c.localisation.latitude,
+              c.localisation.longitude);
+          return distance <= distanceMax;
+        }).toList();
+      }
+      return filtered;
+    } catch (e) {
+      print("Erreur CommercantService - searchCommercants (Firestore): $e");
+      return [];
+    }
   }
 
+  // TODO: Déplacer cette méthode dans un utilitaire de géolocalisation ou MapsService si réutilisée ailleurs.
   double _calculateDistance(
       double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371; // en kilomètres
@@ -478,26 +234,60 @@ class CommercantService {
     return earthRadius * c;
   }
 
-  Future<void> updateCommercant(CommercantModel commercant) async {
-    _initializeMockData();
-    await Future.delayed(const Duration(milliseconds: 400));
+  // Les méthodes addCommercant et updateCommercant qui opéraient sur les mocks sont supprimées.
+  // Les opérations d'écriture se font via createOrUpdateCommercant, updateCommercantInfo, etc.
+  // qui utilisent déjà Firestore.
 
-    final index = _commercantsMock.indexWhere((c) => c.id == commercant.id);
-    if (index != -1) {
-      _commercantsMock[index] = commercant.copyWith(
-        dateModification: DateTime.now(),
-      );
-    } else {
-      throw Exception('Commerçant non trouvé');
+  // Future<void> updateCommercant(CommercantModel commercant) async {
+  //   // Remplacé par createOrUpdateCommercant ou updateCommercantInfo
+  // }
+
+  // Future<bool> addCommercant(CommercantModel commercant) async {
+  //   // Remplacé par createOrUpdateCommercant (qui fait un set, donc création si non existant)
+  //   // ou une méthode createCommercant dédiée si on veut un ID auto-généré par Firestore.
+  // }
+
+
+  // Ces méthodes étaient déjà pour Firebase, s'assurer qu'elles sont cohérentes
+  // avec les autres changements (par exemple, utilisation de commercant.id pour doc().set())
+  Future<bool> createCommercant(CommercantModel commercant) async {
+    try {
+      // Si l'ID du commerçant est déjà défini et doit être utilisé comme ID de document:
+      // await _firestore.collection(_collectionPath).doc(commercant.id).set(commercant.toMap());
+      // Si l'ID doit être auto-généré par Firestore:
+      DocumentReference docRef = await _firestore.collection(_collectionPath).add(commercant.toMapWithoutId());
+      // Optionnel: mettre à jour le modèle avec l'ID généré si besoin immédiat.
+      // commercant = commercant.copyWith(id: docRef.id);
+      return true;
+    } catch (e) {
+      print('Erreur lors de la création du commerçant: $e');
+      return false;
     }
   }
 
-  Future<bool> addCommercant(CommercantModel commercant) async {
-    _initializeMockData();
-    await Future.delayed(const Duration(milliseconds: 600));
+  Future<bool> updateCommercantFirebase(CommercantModel commercant) async {
+    try {
+      await _firestore
+          .collection(_collectionPath)
+          .doc(commercant.id)
+          .update(commercant.toMap()); // toMap() devrait exclure l'ID si l'ID est l'ID du document
+                                     // ou être idempotent si l'ID est inclus.
+                                     // CommercantModel.toMap() n'inclut pas l'ID, c'est bien.
+      return true;
+    } catch (e) {
+      print('Erreur lors de la mise à jour du commerçant: $e');
+      return false;
+    }
+  }
 
-    _commercantsMock.add(commercant);
-    return true;
+  Future<bool> deleteCommercantFirebase(String id) async {
+    try {
+      await _firestore.collection(_collectionPath).doc(id).delete();
+      return true;
+    } catch (e) {
+      print('Erreur lors de la suppression du commerçant: $e');
+      return false;
+    }
   }
 
   Future<bool> createCommercant(CommercantModel commercant) async {
