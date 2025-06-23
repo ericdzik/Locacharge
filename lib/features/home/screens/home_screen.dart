@@ -64,11 +64,26 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _mapController = MapController();
-    _requestLocationPermission();
-    _applyFiltersAndSearch(); // Charger initialement les données
     _searchController.addListener(_onSearchChanged);
-    _loadCommercants();
-    _loadRecentSearches();
+    // _loadRecentSearches(); // Est vide, peut être enlevé si non utilisé
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _requestLocationPermission(); // Peut utiliser _mapController
+        _loadCommercants(); // Charge les commerçants, peut implicitement déclencher _applyFiltersAndSearch
+                           // ou _applyFiltersAndSearch peut être appelé à la fin de _loadCommercants si nécessaire
+                           // Pour l'instant, _loadCommercants initialise _filteredCommercants.
+                           // L'appel initial à _applyFiltersAndSearch est redondant si _loadCommercants le fait déjà.
+                           // Assurons-nous que _applyFiltersAndSearch est appelé au bon moment.
+                           // Si _loadCommercants met à jour _commercants, et _applyFiltersAndSearch
+                           // doit s'exécuter sur cette liste, alors l'ordre est important.
+                           // _loadCommercants() appelle setState, donc cela devrait reconstruire
+                           // et _applyFiltersAndSearch() est appelé par _onSearchChanged et _filterCommercants
+                           // L'appel initial à _applyFiltersAndSearch ici est peut-être le plus simple
+                           // pour s'assurer que les filtres par défaut sont appliqués sur les données chargées.
+        _applyFiltersAndSearch();
+      }
+    });
   }
 
   @override
@@ -651,29 +666,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadCommercants() async {
-    // Modifié pour utiliser CommercantService qui appelle maintenant Firestore
+    if (!mounted) return; // Ajout d'une vérification mounted
     setState(() => _isLoading = true);
     try {
       final commercants = await _commercantService.getAllCommercants();
       if (mounted) {
         setState(() {
           _commercants = commercants;
-          _filteredCommercants = commercants; // Initialiser avec tous les commerçants
+          // _filteredCommercants = commercants; // _applyFiltersAndSearch s'en chargera
           _isLoading = false;
         });
+        // Après avoir chargé les commerçants, appliquer les filtres/recherche initiaux.
+        // Cela garantit que _applyFiltersAndSearch opère sur la liste _commercants chargée.
+        _applyFiltersAndSearch();
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
+        _showErrorSnackBar('Erreur lors du chargement des commerçants: ${e.toString()}');
       }
-      _showErrorSnackBar('Erreur lors du chargement des commerçants: ${e.toString()}');
     }
   }
 
   Future<void> _loadRecentSearches() async {
-    // Méthode non nécessaire pour le moment
+    // Méthode vide, peut être supprimée si non utilisée.
+    // Pour l'instant, on la laisse au cas où elle serait prévue pour plus tard.
   }
 
   void _filterCommercants(String filter) {
