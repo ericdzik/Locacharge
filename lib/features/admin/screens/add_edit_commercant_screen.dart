@@ -23,6 +23,7 @@ class AddEditCommercantScreen extends StatefulWidget {
 class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
   final _formKey = GlobalKey<FormState>();
   final CommercantService _commercantService = CommercantService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // S'assurer que cette ligne est bien présente
   // final AuthService _authService = AuthService(); // TODO
   // final UserService _userService = UserService(); // TODO
 
