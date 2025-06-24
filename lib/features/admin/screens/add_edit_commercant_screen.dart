@@ -1,5 +1,6 @@
 // lib/features/admin/screens/add_edit_commercant_screen.dart
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Ajout de l'import
 import 'package:locacharge/core/models/commercant_model.dart';
 import 'package:locacharge/core/models/localisation_model.dart';
 import 'package:locacharge/core/models/horaire_model.dart'; // Pour structure horaire
@@ -94,7 +95,7 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
     // et a un document dans la collection 'users' avec UserRole.commercant.
     // L'ID du document commerçant sera soit celui existant, soit un nouveau si widget.commercantToEdit est null.
 
-    final String commercantDocId = widget.commercantToEdit?.id ?? FirebaseFirestore.instance.collection('commercants').doc().id;
+    final String commercantDocId = widget.commercantToEdit?.id ?? _firestore.collection('commercants').doc().id;
     final String commercantUserId = _userIdController.text.trim();
 
     if (commercantUserId.isEmpty) {
