@@ -34,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   LatLng _initialCameraPosition = const LatLng(5.3454, -4.0245); // Abidjan
   LatLng? _userLocation; // Déclaration de _userLocation
   bool _myLocationEnabled = false;
+  bool _isMapReady = false; // Variable d'état pour suivre si la carte est prête
 
   final CommercantService _commercantService = CommercantService();
   final HistoryService _historyService = HistoryService();
@@ -69,19 +70,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _requestLocationPermission(); // Peut utiliser _mapController
-        _loadCommercants(); // Charge les commerçants, peut implicitement déclencher _applyFiltersAndSearch
-                           // ou _applyFiltersAndSearch peut être appelé à la fin de _loadCommercants si nécessaire
-                           // Pour l'instant, _loadCommercants initialise _filteredCommercants.
-                           // L'appel initial à _applyFiltersAndSearch est redondant si _loadCommercants le fait déjà.
-                           // Assurons-nous que _applyFiltersAndSearch est appelé au bon moment.
-                           // Si _loadCommercants met à jour _commercants, et _applyFiltersAndSearch
-                           // doit s'exécuter sur cette liste, alors l'ordre est important.
-                           // _loadCommercants() appelle setState, donc cela devrait reconstruire
-                           // et _applyFiltersAndSearch() est appelé par _onSearchChanged et _filterCommercants
-                           // L'appel initial à _applyFiltersAndSearch ici est peut-être le plus simple
-                           // pour s'assurer que les filtres par défaut sont appliqués sur les données chargées.
-        _applyFiltersAndSearch();
+        // _requestLocationPermission(); // Déplacé vers _onMapIsReady()
+        _loadCommercants();
+        // _applyFiltersAndSearch(); // Est appelé à la fin de _loadCommercants et aussi par _onMapIsReady->...->_applyFiltersAndSearch
+                                 // L'appel ici peut être redondant ou causer un double chargement/filtrage initial.
+                                 // Il est préférable de le laisser être appelé par _loadCommercants ou par des actions utilisateur.
+                                 // Si un filtre initial doit être appliqué dès le début, _loadCommercants
+                                 // s'en charge après avoir récupéré les données.
       }
     });
   }
@@ -109,13 +104,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _getCurrentLocationAndCenterMap() async {
-    if (!_myLocationEnabled || _mapController == null) return;
+    if (!_isMapReady || !_myLocationEnabled || _mapController == null || !mounted) return;
+
     try {
       Position position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
-      _mapController?.move(LatLng(position.latitude, position.longitude), 14.0);
+      if (mounted) { // Vérifier à nouveau avant d'utiliser _mapController ou setState
+        setState(() {
+          _userLocation = LatLng(position.latitude, position.longitude);
+        });
+        _mapController?.move(_userLocation!, 14.0);
+        // Optionnel: Rafraîchir la liste si le tri par proximité est actif ou si les distances doivent être mises à jour
+        // _applyFiltersAndSearch(); // Déjà appelé à la fin de _loadCommercants et dans _onMapIsReady via _requestLocationPermission
+      }
     } catch (e) {
       print("Erreur de géolocalisation: $e");
+      // Peut-être afficher une SnackBar ici aussi
     }
   }
 
@@ -123,6 +127,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce =
         Timer(const Duration(milliseconds: 500), _applyFiltersAndSearch);
+  }
+
+  Future<void> _onMapIsReady() async {
+    if (mounted) {
+      // Maintenant que la carte est prête, demander la permission de localisation
+      // et potentiellement centrer la carte.
+      await _requestLocationPermission();
+    }
   }
 
   Future<void> _applyFiltersAndSearch() async {
@@ -225,6 +237,14 @@ class _HomeScreenState extends State<HomeScreen> {
       options: MapOptions(
         initialCenter: _initialCameraPosition,
         initialZoom: 11.0,
+        onMapReady: () {
+          if (mounted) {
+            setState(() {
+              _isMapReady = true;
+            });
+            _onMapIsReady();
+          }
+        },
       ),
       children: [
         TileLayer(
@@ -678,6 +698,8 @@ class _HomeScreenState extends State<HomeScreen> {
         });
         // Après avoir chargé les commerçants, appliquer les filtres/recherche initiaux.
         // Cela garantit que _applyFiltersAndSearch opère sur la liste _commercants chargée.
+        // Cet appel est important pour que la liste initiale soit filtrée selon _selectedFilter = "Tous"
+        // et les _filters par défaut.
         _applyFiltersAndSearch();
       }
     } catch (e) {
