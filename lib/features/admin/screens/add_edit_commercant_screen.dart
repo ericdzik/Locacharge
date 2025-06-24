@@ -42,8 +42,8 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
   void initState() {
     super.initState();
     _nomController = TextEditingController(text: widget.commercantToEdit?.nom);
-    _userIdController = TextEditingController(
-        text: widget.commercantToEdit?.id); // ID du commerçant est l'UID
+    // Initialiser avec le champ userId du CommercantModel
+    _userIdController = TextEditingController(text: widget.commercantToEdit?.userId);
     _latController = TextEditingController(
         text: widget.commercantToEdit?.localisation.latitude.toString());
     _lonController = TextEditingController(
@@ -92,6 +92,19 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
     // SIMPLIFICATION: Création du compte Firebase Auth et du document user associé est un TODO.
     // On suppose que l'UID fourni dans _userIdController existe déjà dans Firebase Auth
     // et a un document dans la collection 'users' avec UserRole.commercant.
+    // L'ID du document commerçant sera soit celui existant, soit un nouveau si widget.commercantToEdit est null.
+
+    final String commercantDocId = widget.commercantToEdit?.id ?? FirebaseFirestore.instance.collection('commercants').doc().id;
+    final String commercantUserId = _userIdController.text.trim();
+
+    if (commercantUserId.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("L'ID Utilisateur (Firebase UID) est requis et ne peut être vide.")));
+        setState(() => _isLoading = false);
+      }
+      return;
+    }
 
     final localisation = LocalisationModel(
       latitude: double.parse(_latController.text),
@@ -101,17 +114,14 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
 
     // TODO: Ajouter une UI pour gérer les horaires
     final horaires = widget.commercantToEdit?.horaires ??
-        <HoraireModel>[
-          // Horaire par défaut si nouveau, à améliorer
-          HoraireModel(
-              jour: "Lundi-Vendredi", ouverture: "09:00", fermeture: "18:00")
-        ];
+        <HoraireModel>[HoraireModel(jour: "Lundi-Vendredi", ouverture: "09:00", fermeture: "18:00")];
 
     final commercant = CommercantModel(
-      id: _userIdController.text.trim(), // UID de l'utilisateur Firebase
+      id: commercantDocId, // ID du document Firestore
+      userId: commercantUserId, // UID de l'utilisateur Firebase
       nom: _nomController.text,
       localisation: localisation,
-      horaires: horaires, // Horaires à gérer
+      horaires: horaires,
       telephone: _telController.text,
       imageUrl: _imageUrlController.text,
       statutDisponibilite: _statutDisponibilite,
@@ -162,10 +172,13 @@ class _AddEditCommercantScreenState extends State<AddEditCommercantScreen> {
                       controller: _userIdController,
                       decoration: const InputDecoration(
                           labelText: 'ID Utilisateur (Firebase UID)'),
-                      validator: (value) =>
-                          value!.isEmpty ? 'Champ requis' : null,
-                      enabled: widget.commercantToEdit ==
-                          null, // Non modifiable si édition
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'L\'ID Utilisateur (Firebase UID) est requis.';
+                        }
+                        return null;
+                      },
+                      // enabled: widget.commercantToEdit == null, // L'admin pourrait avoir besoin de le changer
                     ),
                     TextFormField(
                       controller: _nomController,

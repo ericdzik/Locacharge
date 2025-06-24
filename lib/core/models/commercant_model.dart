@@ -20,7 +20,8 @@ enum TypeCommercant {
 }
 
 class CommercantModel {
-  final String id;
+  final String id; // ID du document Firestore
+  final String userId; // UID de l'utilisateur Firebase associé
   final String nom;
   final String? description;
   final LocalisationModel localisation;
@@ -40,6 +41,7 @@ class CommercantModel {
 
   CommercantModel({
     required this.id,
+    required this.userId,
     required this.nom,
     this.description,
     required this.localisation,
@@ -61,7 +63,8 @@ class CommercantModel {
   // Méthode pour la sérialisation/désérialisation Firestore
   factory CommercantModel.fromMap(String id, Map<String, dynamic> data) {
     return CommercantModel(
-      id: id,
+      id: id, // ID du document
+      userId: data['userId'] as String? ?? '', // Lire le userId, fournir une valeur par défaut si manquant
       nom: data['nom'] as String,
       description: data['description'] as String?,
       localisation: LocalisationModel.fromMap(
@@ -96,6 +99,7 @@ class CommercantModel {
 
   Map<String, dynamic> toMap() {
     return {
+      'userId': userId, // Ajouter userId au map
       'nom': nom,
       if (description != null) 'description': description,
       'localisation': localisation.toMap(),
@@ -117,6 +121,8 @@ class CommercantModel {
 
   Map<String, dynamic> toMapWithoutId() {
     return {
+      // id est omis car auto-généré par Firestore lors de add()
+      'userId': userId, // Ajouter userId au map
       'nom': nom,
       if (description != null) 'description': description,
       'localisation': localisation.toMap(),
@@ -191,6 +197,7 @@ class CommercantModel {
 
   CommercantModel copyWith({
     String? id,
+    String? userId,
     String? nom,
     String? description,
     LocalisationModel? localisation,
@@ -210,6 +217,7 @@ class CommercantModel {
   }) {
     return CommercantModel(
       id: id ?? this.id,
+      userId: userId ?? this.userId,
       nom: nom ?? this.nom,
       description: description ?? this.description,
       localisation: localisation ?? this.localisation,
