@@ -47,41 +47,39 @@ class _DashboardCommercantScreenState extends State<DashboardCommercantScreen> {
     });
     final firebaseUser = _authService.currentUser;
     if (firebaseUser == null) {
-      // Rediriger vers login si pas d'utilisateur (ne devrait pas arriver si bien protégé)
-      // Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
       if (mounted) {
+        print('DashboardCommercantScreen - _loadData - Utilisateur non connecté (firebaseUser est null).');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  "Utilisateur non connecté. Redirection nécessaire (TODO).")),
+          const SnackBar(content: Text("Utilisateur non connecté. Redirection nécessaire (TODO).")),
         );
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
       return;
     }
+    print('DashboardCommercantScreen - _loadData - Chargement pour firebaseUser.uid: ${firebaseUser.uid}');
 
     _currentUserData = await _userService.getUserById(firebaseUser.uid);
-    // Supposons que l'ID utilisateur est l'ID du document commerçant
+
     if (_currentUserData?.role == UserRole.commercant) {
       _commercantData = await _commercantService.getCommercantByUserId(firebaseUser.uid);
+      print('DashboardCommercantScreen - _loadData - Résultat 1er appel getCommercantByUserId: ${_commercantData?.id}');
 
-      // Si non trouvé immédiatement, attendre un peu et réessayer (pour délai de propagation Firestore)
       if (_commercantData == null) {
+        print('DashboardCommercantScreen - _loadData - Commerçant non trouvé, nouvelle tentative après délai...');
         await Future.delayed(const Duration(seconds: 2));
         _commercantData = await _commercantService.getCommercantByUserId(firebaseUser.uid);
+        print('DashboardCommercantScreen - _loadData - Résultat 2nd appel getCommercantByUserId: ${_commercantData?.id}');
       }
 
-      // Charger les vraies statistiques de visites
       if (_commercantData != null) {
         _visitsCount = await _analyticsService.getCommercantViews(_commercantData!.id, days: 30);
       }
     } else {
-      _commercantData = null; // S'assurer qu'il est null si ce n'est pas un commerçant
+      _commercantData = null;
     }
 
     if (!mounted) return;
+    print('DashboardCommercantScreen - _loadData - État final _commercantData: ${_commercantData?.id}, _currentUserData.role: ${_currentUserData?.role}');
     setState(() {
       _isLoading = false;
     });

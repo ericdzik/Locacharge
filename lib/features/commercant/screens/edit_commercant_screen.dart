@@ -72,6 +72,7 @@ class _EditCommercantScreenState extends State<EditCommercantScreen> {
     });
 
     try {
+      print('EditCommercantScreen - Commerçant original ID: ${widget.commercant.id}, UserID: ${widget.commercant.userId}');
       final updatedCommercant = widget.commercant.copyWith(
         nom: _nomController.text.trim(),
         description: _descriptionController.text.trim().isEmpty
@@ -89,6 +90,7 @@ class _EditCommercantScreenState extends State<EditCommercantScreen> {
         horaires: _horaires,
         dateModification: DateTime.now(),
       );
+      print('EditCommercantScreen - Données envoyées pour la mise à jour: ${updatedCommercant.toMap()}');
 
       // Remplacer par la méthode Firebase appropriée, par exemple updateCommercantFirebase
       // ou createOrUpdateCommercant si l'ID est déjà celui du document Firestore.

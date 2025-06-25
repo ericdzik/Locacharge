@@ -19,16 +19,20 @@ class CommercantService {
   // Les données mockées et _initializeMockData() sont supprimées.
 
   Future<CommercantModel?> getCommercantByUserId(String userId) async {
+    print('CommercantService - Recherche commerçant par UserID: $userId');
     try {
       final querySnapshot = await _firestore
           .collection(_collectionPath)
           .where('userId', isEqualTo: userId) // Supposant un champ 'userId' dans le document commerçant
           .limit(1)
           .get();
+      print('CommercantService - getCommercantByUserId - Nombre de documents trouvés: ${querySnapshot.docs.length}');
       if (querySnapshot.docs.isNotEmpty) {
         final doc = querySnapshot.docs.first;
+        print('CommercantService - getCommercantByUserId - Document trouvé: ${doc.id}, Data: ${doc.data()}');
         return CommercantModel.fromMap(doc.id, doc.data() as Map<String, dynamic>);
       }
+      print('CommercantService - getCommercantByUserId - Aucun document trouvé pour UserID: $userId');
       return null;
     } catch (e) {
       print('Erreur CommercantService - getCommercantByUserId: $e');
@@ -267,6 +271,8 @@ class CommercantService {
   }
 
   Future<bool> updateCommercantFirebase(CommercantModel commercant) async {
+    print('CommercantService - Tentative de mise à jour du document ID: ${commercant.id}');
+    print('CommercantService - Données pour la mise à jour: ${commercant.toMap()}');
     try {
       await _firestore
           .collection(_collectionPath)
