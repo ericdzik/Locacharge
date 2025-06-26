@@ -59,8 +59,8 @@ class ProduitModel {
       imageUrl: json['imageUrl'] as String?,
       operateurs: List<String>.from(json['operateurs'] ?? []),
       specifications: json['specifications'] as Map<String, dynamic>?,
-      dateCreation: (json['dateCreation'] as Timestamp).toDate(),
-      dateModification: (json['dateModification'] as Timestamp).toDate(),
+      dateCreation: DateTime.parse(json['dateCreation'] as String),
+      dateModification: DateTime.parse(json['dateModification'] as String),
     );
   }
 
