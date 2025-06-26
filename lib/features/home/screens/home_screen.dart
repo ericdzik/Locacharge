@@ -235,7 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
-        initialCenter: _initialCameraPosition,
+        initialCenter: _initialCameraPosition, // Confirmé: Lomé, Togo
         initialZoom: 11.0,
         onMapReady: () {
           if (mounted) {
