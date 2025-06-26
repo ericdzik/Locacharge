@@ -92,8 +92,8 @@ class CommercantModel {
       services: List<String>.from(data['services'] ?? []),
       note: data['note'] as double?,
       nombreEvaluations: data['nombreEvaluations'] as int? ?? 0,
-      dateCreation: DateTime.parse(data['dateCreation'] as String),
-      dateModification: DateTime.parse(data['dateModification'] as String),
+      dateCreation: (data['dateCreation'] as Timestamp).toDate(),
+      dateModification: (data['dateModification'] as Timestamp).toDate(),
     );
   }
 
@@ -114,15 +114,15 @@ class CommercantModel {
       'services': services,
       if (note != null) 'note': note,
       'nombreEvaluations': nombreEvaluations,
-      'dateCreation': dateCreation.toIso8601String(),
-      'dateModification': dateModification.toIso8601String(),
+      'dateCreation': dateCreation, // Passer DateTime directement
+      'dateModification': dateModification, // Passer DateTime directement
     };
   }
 
   Map<String, dynamic> toMapWithoutId() {
     return {
       // id est omis car auto-généré par Firestore lors de add()
-      'userId': userId, // Ajouter userId au map
+      'userId': userId,
       'nom': nom,
       if (description != null) 'description': description,
       'localisation': localisation.toMap(),
@@ -137,9 +137,8 @@ class CommercantModel {
       'services': services,
       if (note != null) 'note': note,
       'nombreEvaluations': nombreEvaluations,
-      'dateCreation': dateCreation.toIso8601String(),
-      'dateModification': dateModification.toIso8601String(),
-      // 'userId': id, // Supposant que l'ID du commerçant est l'UID de l'utilisateur pour la création via add()
+      'dateCreation': dateCreation, // Passer DateTime directement
+      'dateModification': dateModification, // Passer DateTime directement
     };
   }
 

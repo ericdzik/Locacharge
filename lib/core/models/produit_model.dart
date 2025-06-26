@@ -59,8 +59,8 @@ class ProduitModel {
       imageUrl: json['imageUrl'] as String?,
       operateurs: List<String>.from(json['operateurs'] ?? []),
       specifications: json['specifications'] as Map<String, dynamic>?,
-      dateCreation: DateTime.parse(json['dateCreation'] as String),
-      dateModification: DateTime.parse(json['dateModification'] as String),
+      dateCreation: (json['dateCreation'] as Timestamp).toDate(),
+      dateModification: (json['dateModification'] as Timestamp).toDate(),
     );
   }
 
@@ -76,8 +76,8 @@ class ProduitModel {
       'imageUrl': imageUrl,
       'operateurs': operateurs,
       'specifications': specifications,
-      'dateCreation': dateCreation.toIso8601String(),
-      'dateModification': dateModification.toIso8601String(),
+      'dateCreation': dateCreation, // Passer DateTime directement
+      'dateModification': dateModification, // Passer DateTime directement
     };
   }
 
