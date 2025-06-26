@@ -92,8 +92,8 @@ class CommercantModel {
       services: List<String>.from(data['services'] ?? []),
       note: data['note'] as double?,
       nombreEvaluations: data['nombreEvaluations'] as int? ?? 0,
-      dateCreation: DateTime.parse(data['dateCreation'] as String),
-      dateModification: DateTime.parse(data['dateModification'] as String),
+      dateCreation: (data['dateCreation'] as Timestamp).toDate(),
+      dateModification: (data['dateModification'] as Timestamp).toDate(),
     );
   }
 
