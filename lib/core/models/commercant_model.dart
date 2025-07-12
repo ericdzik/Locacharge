@@ -1,4 +1,5 @@
 // lib/core/models/commercant_model.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:locacharge/core/models/horaire_model.dart';
 import 'package:locacharge/core/models/localisation_model.dart';
 import 'package:locacharge/core/models/produit_model.dart';
@@ -88,9 +89,23 @@ class CommercantModel {
       services: List<String>.from(data['services'] ?? []),
       note: data['note'] as double?,
       nombreEvaluations: data['nombreEvaluations'] as int? ?? 0,
-      dateCreation: DateTime.parse(data['dateCreation'] as String),
-      dateModification: DateTime.parse(data['dateModification'] as String),
+      dateCreation: _parseDate(data['dateCreation']),
+      dateModification: _parseDate(data['dateModification']),
     );
+  }
+
+  // Helper pour parser les dates depuis Firestore
+  static DateTime _parseDate(dynamic dateValue) {
+    if (dateValue is Timestamp) {
+      return dateValue.toDate();
+    } else if (dateValue is String) {
+      return DateTime.parse(dateValue);
+    } else if (dateValue is DateTime) {
+      return dateValue;
+    } else {
+      // Valeur par défaut si la date est manquante ou invalide
+      return DateTime.now();
+    }
   }
 
   Map<String, dynamic> toMap() {

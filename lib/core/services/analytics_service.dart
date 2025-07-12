@@ -41,6 +41,13 @@ class AnalyticsService {
 
       return querySnapshot.docs.length;
     } catch (e) {
+      // Gérer spécifiquement les erreurs d'index Firestore
+      if (e.toString().contains('failed-precondition') ||
+          e.toString().contains('requires an index')) {
+        print(
+            'Index Firestore manquant pour les analytics. Retour de valeur par défaut.');
+        return 0; // Retourner 0 au lieu de faire planter l'app
+      }
       print('Erreur lors de la récupération des vues: $e');
       return 0;
     }
@@ -85,6 +92,18 @@ class AnalyticsService {
         'averageViewsPerDay': views30Days.docs.length / 30,
       };
     } catch (e) {
+      // Gérer spécifiquement les erreurs d'index Firestore
+      if (e.toString().contains('failed-precondition') ||
+          e.toString().contains('requires an index')) {
+        print(
+            'Index Firestore manquant pour les statistiques. Retour de valeurs par défaut.');
+        return {
+          'totalViews30Days': 0,
+          'totalViews7Days': 0,
+          'viewsToday': 0,
+          'averageViewsPerDay': 0,
+        };
+      }
       print('Erreur lors de la récupération des statistiques: $e');
       return {
         'totalViews30Days': 0,

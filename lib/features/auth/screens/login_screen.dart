@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:locacharge/core/services/auth_service.dart';
+import 'package:locacharge/core/services/user_service.dart';
+import 'package:locacharge/features/auth/screens/login_redirect_logic.dart';
 import 'package:locacharge/shared/styles/colors.dart';
 import 'package:locacharge/shared/widgets/modern_buttons.dart';
 import 'package:locacharge/shared/widgets/modern_input_fields.dart';
@@ -19,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authService = AuthService();
+  final _userService = UserService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -43,13 +46,15 @@ class _LoginScreenState extends State<LoginScreen> {
       String phoneToEmail(String phone) =>
           phone.replaceAll('+', '').replaceAll(' ', '') + '@locacharge.com';
       final emailFictif = phoneToEmail(phone);
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailFictif,
         password: password,
       );
 
-      if (mounted) {
-        context.go('/home');
+      if (mounted && userCredential.user != null) {
+        await LoginRedirectLogic.handleLoginSuccess(
+            context, userCredential.user!, _userService);
       }
     } catch (e) {
       if (mounted) {

@@ -39,7 +39,7 @@ class AuthService {
       if (googleUser == null) {
         throw FirebaseAuthException(
           code: 'CANCELLED',
-          message: 'Connexion annulée par l’utilisateur',
+          message: "Connexion annulée par l'utilisateur",
         );
       }
 
@@ -62,7 +62,16 @@ class AuthService {
   Future<void> signOut() async {
     try {
       await _auth.signOut();
-      await GoogleSignIn().signOut(); // facultatif
+      // Éviter l'initialisation automatique de Google Sign-In
+      try {
+        final googleSignIn = GoogleSignIn();
+        if (await googleSignIn.isSignedIn()) {
+          await googleSignIn.signOut();
+        }
+      } catch (e) {
+        // Ignorer les erreurs Google Sign-In pour éviter les problèmes de configuration
+        debugPrint("Google Sign-In non configuré ou erreur ignorée: $e");
+      }
     } catch (e) {
       debugPrint("Erreur déconnexion : $e");
       rethrow;
